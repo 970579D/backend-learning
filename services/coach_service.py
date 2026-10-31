@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 
 from models.response_model import Response_Model
-from models.user_model import User, Coach
+from models.user_model import User, CoachProfile
 from repositories.coach_repository import CoachRepository
 
 class CoachService:
@@ -23,7 +23,10 @@ class CoachService:
 
         result: User = None
 
-        input_user = Coach(username = user["username"], password = user["password"])
+        input_user = CoachProfile(username = user["username"], 
+                                  password = user["password"], 
+                                  firstname = user["firstname"],
+                                  lastname = user["lastname"])
 
         self.repository.create(db, input_user)
         result = self.repository.find_user(db, user, False)

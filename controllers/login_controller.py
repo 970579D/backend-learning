@@ -18,12 +18,12 @@ def create_login_coach(user: dict, db: Session = Depends(get_db)):
     
 @router.post("/learner")
 def create_login_leaner(user: dict, db: Session = Depends(get_db)):
-    return login_service.create_login_leaner(db, user)
+    return login_service.create_login_learner(db, user)
 
 @router.put("/logout/coach")
 def logout_coach(logout: dict, db: Session = Depends(get_db)):
-    return login_service.logout(db, logout)
+    return login_service.logout_coach(db, logout)
 
 @router.put("/logout/learner")
 def logout_learner(logout: dict, db: Session = Depends(get_db)):
-    return login_service.logout(db, logout)
+    return login_service.logout_learner(db, logout)

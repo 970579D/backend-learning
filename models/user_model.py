@@ -1,11 +1,11 @@
 from datetime import datetime
-
 from pydantic import BaseModel
 from sqlalchemy import BigInteger, Column, String, DateTime, text
-from sqlalchemy.orm import Mapped
+from sqlalchemy.orm import Mapped, relationship
+
+from models.skill_model import coach_skill
 
 from database import Base
-
 
 class User(Base):
     __abstract__ = True
@@ -27,6 +27,16 @@ class User(Base):
         nullable=False,
     )
 
+    firstname: Mapped[str] = Column(
+        String(50),
+        nullable=False,
+    )
+
+    lastname: Mapped[str] = Column(
+        String(50),
+        nullable=False,
+    )
+
     create_date: Mapped[datetime] = Column(
         DateTime(timezone=True),
         nullable=False,
@@ -39,8 +49,17 @@ class User(Base):
         server_default=text("CURRENT_TIMESTAMP"),
     )
 
-class Coach(User):
+class CoachProfile(User):
     __tablename__ = "coach_profile"
+
+    status: Mapped[str] = Column(String(20), nullable=False, server_default=text("'active'"))
+
+    skills: Mapped[set["Skill"]] = relationship(
+        secondary="coach_skill",
+        back_populates="coaches",
+        lazy="selectin",
+        passive_deletes=True,
+    )
 
 
 class Learner(User):
@@ -49,3 +68,5 @@ class Learner(User):
 class UserRequest(BaseModel):
     username: str
     password: str
+    firstname: str
+    lastname: str

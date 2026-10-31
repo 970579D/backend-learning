@@ -23,7 +23,10 @@ class LearnerService:
 
         result: User = None
 
-        input_user = Learner(username = user["username"], password = user["password"])
+        input_user = Learner(username = user["username"], 
+                            password = user["password"], 
+                            firstname = user["firstname"],
+                            lastname = user["lastname"])
 
         self.repository.create(db, input_user)
         result = self.repository.find_user(db, user, False)

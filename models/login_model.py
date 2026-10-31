@@ -1,5 +1,4 @@
 from datetime import datetime
-
 from sqlalchemy import (
     BigInteger,
     String,
@@ -10,7 +9,6 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from database import Base
-
 
 class Login(Base):
     __abstract__ = True
@@ -24,7 +22,6 @@ class Login(Base):
     username: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
-        unique=True,
     )
 
     session: Mapped[str] = mapped_column(

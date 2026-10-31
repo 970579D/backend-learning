@@ -14,7 +14,7 @@ class LoginRepository:
     #     )
     #     return result
 
-    def find_coach_login(self, db: Session, username: str) -> Login | None:
+    def find_login_coach(self, db: Session, username: str) -> Login | None:
         result = db.scalars(
             select(CoachLogin)
                 .where(CoachLogin.username == username)
@@ -22,7 +22,7 @@ class LoginRepository:
     ).one_or_none()
         return result
     
-    def find_learner_login(self, db: Session, username: str) -> Login | None:
+    def find_login_learner(self, db: Session, username: str) -> Login | None:
         result = db.scalars(
             select(LearnerLogin)
                 .where(LearnerLogin.username == username)
@@ -30,13 +30,13 @@ class LoginRepository:
     ).one_or_none()
         return result
 
-    def find_coach_login_by_session(self, db: Session, session: str) -> Login:
+    def find_login_coach_by_session(self, db: Session, session: str) -> Login:
         result: Login = list(
             db.scalars(select(CoachLogin).where(CoachLogin.session == session).where(CoachLogin.logout_date.is_(None)))
         )
         return result
 
-    def find_learner_login_by_session(self, db: Session, session: str) -> Login:
+    def find_login_learner_by_session(self, db: Session, session: str) -> Login:
         result: Login = list(
             db.scalars(select(LearnerLogin).where(LearnerLogin.session == session).where(LearnerLogin.logout_date.is_(None)))
         )
@@ -51,18 +51,8 @@ class LoginRepository:
         db.add(input_login)
         db.commit()
         db.refresh(input_login)
-        selected_login = self.find_login(db, login.username)
+        selected_login = self.find_login_coach(db, login.username)
         return selected_login
-
-    def coach_logout(self, db: Session, session: str) -> bool:
-        result = db.execute(
-            update(CoachLogin)
-            .where(CoachLogin.session == session)
-            .where(CoachLogin.logout_date.is_(None))
-            .values(logout_date=func.now())
-        )
-        db.commit()
-        return result.rowcount > 0
 
     def create_login_learner(
         self,
@@ -73,10 +63,21 @@ class LoginRepository:
         db.add(input_login)
         db.commit()
         db.refresh(input_login)
-        selected_login = self.find_login(db, login.username)
+        selected_login = self.find_login_learner(db, login.username)
         return selected_login
 
-    def coach_logout(self, db: Session, session: str) -> bool:
+    def update_logout_coach(self, db: Session, session: str) -> bool:
+        result = db.execute(
+            update(CoachLogin)
+            .where(CoachLogin.session == session)
+            .where(CoachLogin.logout_date.is_(None))
+            .values(logout_date=func.now())
+        )
+        db.commit()
+        return result.rowcount > 0
+
+    
+    def update_logout_learner(self, db: Session, session: str) -> bool:
         result = db.execute(
             update(LearnerLogin)
             .where(LearnerLogin.session == session)
@@ -85,13 +86,3 @@ class LoginRepository:
         )
         db.commit()
         return result.rowcount > 0
-    
-    def learner_logout(self, db: Session, session: str) -> bool:
-            result = db.execute(
-                update(LearnerLogin)
-                .where(LearnerLogin.session == session)
-                .where(LearnerLogin.logout_date.is_(None))
-                .values(logout_date=func.now())
-            )
-            db.commit()
-            return result.rowcount > 0

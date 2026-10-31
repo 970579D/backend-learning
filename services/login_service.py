@@ -16,7 +16,7 @@ class LoginService:
     def __init__(self):
         self.repository = LoginRepository()
         self.coach_repository = CoachRepository()
-        self.learner_repository = LearnerRepository
+        self.learner_repository = LearnerRepository()
 
     def find_login(self, db: Session, username: str) -> Response_Model[Login]:
         res: Response_Model = Response_Model(status=constants.SUCCESS, message=utils.res_status_msg(constants.LOGIN, constants.SUCCESS))
@@ -51,7 +51,8 @@ class LoginService:
 
     def create_login_learner(self, db: Session, login_request: UserRequest) -> Response_Model[Login]:
         res: Response_Model = Response_Model(status=constants.SUCCESS, message=utils.res_status_msg(constants.LOGIN, constants.SUCCESS))
-    
+
+        print(login_request)
         find_user = self.learner_repository.find_user(db, login_request, isPassword=True)
         print(find_user)
         if not find_user:
@@ -78,13 +79,13 @@ class LoginService:
     def logout_coach(self, db: Session, logout: dict) -> Response_Model[Login]:
         res: Response_Model = Response_Model(status=constants.SUCCESS, 
                                                   message=utils.res_status_msg(constants.LOGOUT, constants.SUCCESS))
-        find_login = self.repository.find_login_by_session_coach(db, logout["session"])
+        find_login = self.repository.find_login_coach_by_session(db, logout["session"])
         if not find_login:
             res.status = constants.ERROR
             res.message =  utils.res_status_msg(constants.LOGOUT, constants.ERROR, "Login session does not exist")
             return res 
 
-        result: bool = self.repository.logout_coach(db, logout["session"])
+        result: bool = self.repository.update_logout_coach(db, logout["session"])
         if result == False:
             res.status = constants.ERROR
             res.message = utils.res_status_msg(constants.LOGOUT, constants.ERROR)
@@ -95,13 +96,13 @@ class LoginService:
     def logout_learner(self, db: Session, logout: dict) -> Response_Model[Login]:
             res: Response_Model = Response_Model(status=constants.SUCCESS, 
                                                       message=utils.res_status_msg(constants.LOGOUT, constants.SUCCESS))
-            find_login = self.repository.find_login_by_session_learner(db, logout["session"])
+            find_login = self.repository.find_login_learner_by_session(db, logout["session"])
             if not find_login:
                 res.status = constants.ERROR
                 res.message =  utils.res_status_msg(constants.LOGOUT, constants.ERROR, "Login session does not exist")
                 return res 
     
-            result: bool = self.repository.logout_learner(db, logout["session"])
+            result: bool = self.repository.update_logout_learner(db, logout["session"])
             if result == False:
                 res.status = constants.ERROR
                 res.message = utils.res_status_msg(constants.LOGOUT, constants.ERROR)
