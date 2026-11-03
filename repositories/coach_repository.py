@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from models.response_model import Response_Model
@@ -28,4 +28,12 @@ class CoachRepository:
         db.refresh(user)
 
         return True
-    
+
+    def update_image(self, db: Session, username: str, image_path: str | None) -> bool:
+        result = db.execute(
+            update(CoachProfile)
+            .where(CoachProfile.username == username)
+            .values(image_path=image_path)
+        )
+        db.commit()
+        return result.rowcount > 0

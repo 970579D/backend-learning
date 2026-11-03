@@ -1,7 +1,9 @@
+from urllib import response
+
 from sqlalchemy.orm import Session
 
 from models.response_model import Response_Model
-from models.user_model import User, CoachProfile
+from models.user_model import ImageRequest, User, CoachProfile
 from repositories.coach_repository import CoachRepository
 
 class CoachService:
@@ -42,4 +44,15 @@ class CoachService:
 
         response.data = result
         
+        return response
+
+    def update_image(self, db: Session, req: ImageRequest) -> Response_Model[dict]:
+        response = Response_Model(status="success", message="Image updated successfully")
+
+        if not self.repository.update_image(db, req.username, req.image_path):
+            response.status = "error"
+            response.message = "User does not exist"
+            return response
+
+        response.data = {"username": req.username, "image_path": req.image_path}
         return response

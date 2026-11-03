@@ -37,6 +37,11 @@ class User(Base):
         nullable=False,
     )
 
+    image_path: Mapped[str] = Column(
+        String(50),
+        nullable=False,
+    )
+
     create_date: Mapped[datetime] = Column(
         DateTime(timezone=True),
         nullable=False,
@@ -70,3 +75,7 @@ class UserRequest(BaseModel):
     password: str
     firstname: str
     lastname: str
+
+class ImageRequest(BaseModel):
+    username: str
+    image_path: str
