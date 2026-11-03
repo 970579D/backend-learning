@@ -10,7 +10,16 @@ class CoachService:
         self.repository = CoachRepository()
 
     def find_user(self, db: Session, username: str) -> Response_Model[User]:
-        return self.repository.find_user(db, username)
+        response: Response_Model = Response_Model(status="success", message="User created successfully")
+        input_user = dict(username=username)
+        result: User = self.repository.find_user(db, input_user, isPassword=False)
+        if result == None:
+            response.status = "error"
+            response.message = "User does not exist"
+            return response
+        response.data = result
+        return response
+        return self.repository.find_user(db, input_user, isPassword=False)
 
     def create(self, db: Session, user: User) -> Response_Model[User]:
         response: Response_Model = Response_Model(status="success", message="User created successfully")
