@@ -1,8 +1,10 @@
+from unittest import result
+
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from models.response_model import Response_Model
 from models.user_model import User, CoachProfile
+from models.skill_model import coach_skill
 
 class CoachRepository:
 
@@ -37,3 +39,13 @@ class CoachRepository:
         )
         db.commit()
         return result.rowcount > 0
+    
+
+    def find_skills(self, db: Session, username: str) -> list[dict]:
+        rows = db.execute(
+            select(coach_skill.c.skill_name, coach_skill.c.status)
+            .where(coach_skill.c.username == username)
+            .order_by(coach_skill.c.skill_name)
+        ).all()
+
+        return [{"skill_name": r.skill_name, "status": r.status} for r in rows]

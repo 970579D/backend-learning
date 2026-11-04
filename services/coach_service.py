@@ -3,7 +3,7 @@ from urllib import response
 from sqlalchemy.orm import Session
 
 from models.response_model import Response_Model
-from models.user_model import ImageRequest, User, CoachProfile
+from models.user_model import ImageRequest, User, CoachProfile, UserResponse
 from repositories.coach_repository import CoachRepository
 
 class CoachService:
@@ -11,17 +11,30 @@ class CoachService:
     def __init__(self):
         self.repository = CoachRepository()
 
-    def find_user(self, db: Session, username: str) -> Response_Model[User]:
+    def find_user(self, db: Session, username: str) -> Response_Model[UserResponse]:
         response: Response_Model = Response_Model(status="success", message="User created successfully")
         input_user = dict(username=username)
-        result: User = self.repository.find_user(db, input_user, isPassword=False)
-        if result == None:
+        coach: User = self.repository.find_user(db, input_user, isPassword=False)
+        if coach == None:
             response.status = "error"
             response.message = "User does not exist"
             return response
+
+        skills = self.repository.find_skills(db, username)
+
+        result: UserResponse = UserResponse(
+            username=coach.username,
+            firstname=coach.firstname,
+            lastname=coach.lastname,
+            status=coach.status,
+            image_path=coach.image_path,
+            create_date=coach.create_date,
+            update_date=coach.update_date,
+            skills=skills,
+        )
+
         response.data = result
         return response
-        return self.repository.find_user(db, input_user, isPassword=False)
 
     def create(self, db: Session, user: User) -> Response_Model[User]:
         response: Response_Model = Response_Model(status="success", message="User created successfully")
@@ -55,4 +68,6 @@ class CoachService:
             return response
 
         response.data = {"username": req.username, "image_path": req.image_path}
-        return response
+        return 
+
+    

@@ -58,12 +58,11 @@ class CoachProfile(User):
     __tablename__ = "coach_profile"
 
     status: Mapped[str] = Column(String(20), nullable=False, server_default=text("'active'"))
-
+    
     skills: Mapped[set["Skill"]] = relationship(
-        secondary="coach_skill",
-        back_populates="coaches",
-        lazy="selectin",
-        passive_deletes=True,
+            secondary=coach_skill,
+            back_populates="coaches",
+            passive_deletes=True
     )
 
 
@@ -79,3 +78,13 @@ class UserRequest(BaseModel):
 class ImageRequest(BaseModel):
     username: str
     image_path: str
+
+class UserResponse(BaseModel):
+    username: str
+    firstname: str
+    lastname: str
+    status: str | None = None
+    image_path: str | None = None
+    create_date: datetime
+    update_date: datetime
+    skills: list[dict] | None = None

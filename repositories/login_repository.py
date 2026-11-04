@@ -7,13 +7,6 @@ from models.login_model import CoachLogin, Login, LearnerLogin
 
 class LoginRepository:
 
-    # def find_coach_login(self, db: Session, username: str) -> Login:
-    #     # logout is null
-    #     result: Login = list(
-    #         db.scalars(select(CoachLogin).where(CoachLogin.username == username).where(CoachLogin.logout_date.is_(None)))
-    #     )
-    #     return result
-
     def find_login_coach(self, db: Session, username: str) -> Login | None:
         result = db.scalars(
             select(CoachLogin)

@@ -3,7 +3,7 @@ from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import (
-    BigInteger, Column, DateTime, ForeignKey, String, Table, UniqueConstraint, Uuid, func,
+    BigInteger, CheckConstraint, Column, DateTime, ForeignKey, String, Table, UniqueConstraint, Uuid, func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -14,7 +14,7 @@ coach_skill = Table(
     Base.metadata,
     Column("id", BigInteger, primary_key=True, autoincrement=True),
     Column(
-        "coach_username",
+        "username",
         String(50),
         ForeignKey("coach_profile.username", ondelete="CASCADE", onupdate="CASCADE"),
         nullable=False,
@@ -27,7 +27,10 @@ coach_skill = Table(
         nullable=False,
         index=True,
     ),
-    UniqueConstraint("coach_username", "skill_name", name="uq_coach_skill"),
+    # active = exam passed, inactive = not passed yet
+    Column("status", String(20), nullable=False, server_default="inactive"),
+    UniqueConstraint("username", "skill_name", name="uq_coach_skill"),
+    CheckConstraint("status IN ('active', 'inactive')", name="ck_coach_skill_status"),
 )
 
 
