@@ -39,7 +39,7 @@ class User(Base):
 
     image_path: Mapped[str] = Column(
         String(50),
-        nullable=False,
+        nullable=True,
     )
 
     create_date: Mapped[datetime] = Column(
@@ -48,7 +48,7 @@ class User(Base):
         server_default=text("CURRENT_TIMESTAMP"),
     )
 
-    last_update: Mapped[datetime] = Column(
+    update_date: Mapped[datetime] = Column(
         DateTime(timezone=True),
         nullable=False,
         server_default=text("CURRENT_TIMESTAMP"),
