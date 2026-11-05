@@ -4,8 +4,8 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from models.user_model import User, CoachProfile
-from models.skill_model import coach_skill
-
+from models.skill_model import AssessmentAttempt, Assessment, Skill, Skill, coach_skill
+from uuid import UUID
 class CoachRepository:
 
     def find_user(self, db: Session, user: CoachProfile, isPassword: bool) -> User:
@@ -49,3 +49,21 @@ class CoachRepository:
         ).all()
 
         return [{"skill_name": r.skill_name, "status": r.status} for r in rows]
+
+
+    def find_assessment(self, db: Session, username: str):
+        # (Assessment, category_name) pairs, with the category read from the skill table
+        return db.execute(
+                select(Assessment, Skill.category_name)
+                .join(Skill, Skill.skill_name == Assessment.assessment_skill)
+                .where(Assessment.username == username)
+                .order_by(Assessment.assessment_skill)
+               ).all()
+
+
+    def find_assessment_attempts(self, db: Session, assessment_uuids: list[UUID]) -> list[AssessmentAttempt]:
+        return db.scalars(
+            select(AssessmentAttempt)
+            .where(AssessmentAttempt.assessment_uuid.in_(assessment_uuids))
+            .order_by(AssessmentAttempt.assessment_uuid, AssessmentAttempt.round_attempt)
+        ).all()

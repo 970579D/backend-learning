@@ -43,3 +43,13 @@ class LearnerService:
         response.data = result
         
         return response
+
+    def update_image(self, db: Session, req: Image) -> Response_Model[Image]:
+        response = Response_Model(status="success", message="Image updated successfully")
+        result: bool = self.repository.update_image(db, req.username, req.image_path)
+        if not result:
+            response.status = "error"
+            response.message = "User does not exist"
+            return response
+        response.data = req
+        return response

@@ -1,9 +1,12 @@
+from collections import defaultdict
 from urllib import response
 
+from sqlalchemy import UUID
 from sqlalchemy.orm import Session
 
 from models.response_model import Response_Model
-from models.user_model import ImageRequest, User, CoachProfile, UserResponse
+from models.skill_model import Assessment, AssessmentAttempt, AssessmentResponse, AttemptData
+from models.user_model import Image, User, CoachProfile, UserResponse
 from repositories.coach_repository import CoachRepository
 
 class CoachService:
@@ -59,15 +62,65 @@ class CoachService:
         
         return response
 
-    def update_image(self, db: Session, req: ImageRequest) -> Response_Model[dict]:
+    def update_image(self, db: Session, req: Image) -> Response_Model[Image]:
         response = Response_Model(status="success", message="Image updated successfully")
-
-        if not self.repository.update_image(db, req.username, req.image_path):
+        result: bool = self.repository.update_image(db, req.username, req.image_path)
+        if not result:
             response.status = "error"
             response.message = "User does not exist"
             return response
 
-        response.data = {"username": req.username, "image_path": req.image_path}
-        return 
+        response.data = req
+        return response
 
-    
+    def find_coach_assessment(self, db: Session, username: str) -> Response_Model[list[AssessmentResponse]]:
+        response: Response_Model = Response_Model(status="success", message="OK")
+
+        coach = self.repository.find_user(db, {"username": username}, isPassword=False)
+        if coach is None:
+            response.status = "error"
+            response.message = "User does not exist"
+            return response
+
+        assessments: AssessmentResponse = self.repository.find_assessment(db, username)
+        if not assessments:
+            response.data = []
+            return response
+        
+        skill_by_uuid: dict[UUID, str] = {a.uuid: a.assessment_skill for a, _ in assessments}
+        attempts = self.repository.find_assessment_attempts(db, list(skill_by_uuid))
+
+        skill_by_uuid: dict[UUID, str] = {a.uuid: a.assessment_skill for a, _ in assessments}
+
+        attempt_data: dict[UUID, list[AttemptData]] = defaultdict(list[AttemptData])
+        assessment_data: list[AssessmentResponse] = list[AssessmentResponse]()
+
+        for t in attempts:
+            attempt_data[t.assessment_uuid].append(
+                AttemptData(                                                  # CHANGED: response class, not the table class
+                    id=t.id,
+                    assessment_uuid=t.assessment_uuid,
+                    assessment_skill=skill_by_uuid[t.assessment_uuid],        # CHANGED: new field, it was missing
+                    round_attempt=t.round_attempt,
+                    score=t.score,
+                    status=t.status,
+                    create_date=t.create_date,
+                    update_date=t.update_date,
+                )
+            )
+
+        for a, category in assessments:
+            assessment_data.append(
+                AssessmentResponse(
+                    id=a.id,
+                    uuid=a.uuid,
+                    assessment_skill=a.assessment_skill,
+                    assessment_skill_category=category,
+                    status=a.status,
+                    total_attempt=a.total_attempt,
+                    attemps=attempt_data.get(a.uuid, []), #Input should be a valid dictionary or instance of AttemptData
+                )
+            )
+        response.data = assessment_data
+
+        return response

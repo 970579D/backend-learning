@@ -2,6 +2,7 @@ import uuid as uuid_lib
 from datetime import datetime
 from uuid import UUID
 
+from pydantic import BaseModel
 from sqlalchemy import (
     BigInteger, CheckConstraint, Column, DateTime, ForeignKey, String, Table, UniqueConstraint, Uuid, func,
 )
@@ -53,7 +54,7 @@ class Skill(Base):
     __tablename__ = "skill"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    skill_name: Mapped[str] = mapped_column(String(100), unique=True)      # the key
+    skill_name: Mapped[str] = mapped_column(String(100), unique=True)
     category_name: Mapped[str] = mapped_column(
         String(100),
         ForeignKey("skill_category.category_name", onupdate="CASCADE"),
@@ -73,3 +74,77 @@ class Skill(Base):
         back_populates="skills",
         passive_deletes=True,
     )
+
+class Assessment(Base):
+    
+    __tablename__ = "assessment"
+
+    __table_args__ = (
+        UniqueConstraint("username", "assessment_skill", name="uq_assessment"),
+        CheckConstraint("status IN ('pending', 'pass', 'fail')", name="ck_assessment_status"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    uuid: Mapped[UUID] = mapped_column(Uuid, unique=True, default=uuid_lib.uuid4)
+    username: Mapped[str] = mapped_column(
+        String(50),
+        ForeignKey("coach_profile.username", ondelete="CASCADE", onupdate="CASCADE"),
+        index=True,
+    )
+    assessment_skill: Mapped[str] = mapped_column(
+        String(100),
+        ForeignKey("skill.skill_name", ondelete="CASCADE", onupdate="CASCADE"),
+        index=True,
+    )
+
+    total_attempt: Mapped[int] = mapped_column(BigInteger, server_default="0")
+    status: Mapped[str] = mapped_column(String(20), server_default="pending")
+    create_date: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    update_date: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+class AssessmentAttempt(Base):
+
+    __tablename__ = "assessment_attempt"
+
+    __table_args__ = (
+        UniqueConstraint("assessment_uuid", "round_attempt", name="uq_assessment_attempt"),
+        CheckConstraint("status IN ('pass', 'fail')", name="ck_assessment_attempt_status"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    assessment_uuid: Mapped[UUID] = mapped_column(
+        ForeignKey("assessment.uuid", ondelete="CASCADE", onupdate="CASCADE"), index=True
+    )
+    round_attempt: Mapped[int] = mapped_column(BigInteger)       # 1, 2, 3 ...
+    score: Mapped[int] = mapped_column(BigInteger)
+    status: Mapped[str] = mapped_column(String(20))              # pass / fail
+    create_date: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    update_date: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+class AttemptData(BaseModel):
+    id: int
+    assessment_uuid: UUID
+    assessment_skill: str
+    round_attempt: int
+    score: int
+    status: str
+    create_date: datetime
+    update_date: datetime
+
+
+class AssessmentResponse(BaseModel):
+    id: int
+    uuid: UUID
+    assessment_skill: str
+    assessment_skill_category: str
+    status: str
+    total_attempt: int
+    attemps: list[AttemptData] = []

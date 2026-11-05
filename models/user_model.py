@@ -75,9 +75,9 @@ class UserRequest(BaseModel):
     firstname: str
     lastname: str
 
-class ImageRequest(BaseModel):
+class Image(BaseModel):
     username: str
-    image_path: str
+    image_path: str | None = None
 
 class UserResponse(BaseModel):
     username: str
