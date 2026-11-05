@@ -38,7 +38,7 @@ class User(Base):
     )
 
     image_path: Mapped[str] = Column(
-        String(50),
+        String(255),
         nullable=True,
     )
 

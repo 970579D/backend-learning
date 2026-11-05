@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -17,9 +17,13 @@ def find_user(username: str, db: Session = Depends(get_db)):
 def create(user: dict, db: Session = Depends(get_db)):
     return coach_service.create(db, user)
 
-@router.put("/image")
-def update_coach_image(req: Image, db: Session = Depends(get_db)):
-    return coach_service.update_image(db, req)
+@router.put("/image/{username}")
+def update_coach_image(username: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    return coach_service.update_image(db, username, file)
+
+@router.delete("/image/{username}")
+def delete_coach_image(username: str, db: Session = Depends(get_db)):
+    return coach_service.delete_image(db, username)
 
 @router.get("/assessment/{username}")
 def find_coach_assessment(username: str, db: Session = Depends(get_db)):
