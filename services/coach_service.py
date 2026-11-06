@@ -1,6 +1,7 @@
 from collections import defaultdict
 from urllib import response
 
+from fastapi import UploadFile
 from sqlalchemy import UUID
 from sqlalchemy.orm import Session
 
@@ -63,16 +64,6 @@ class CoachService:
         
         return response
 
-    # def update_image(self, db: Session, req: Image) -> Response_Model[Image]:
-    #     response = Response_Model(status="success", message="Image updated successfully")
-    #     result: bool = self.repository.update_image(db, req.username, req.image_path)
-    #     if not result:
-    #         response.status = "error"
-    #         response.message = "User does not exist"
-    #         return response
-
-    #     response.data = req
-    #     return response
 
     def update_image(self, db: Session, username: str, file: UploadFile) -> Response_Model[dict]:
         response: Response_Model = Response_Model(status="success", message="Image updated successfully")
@@ -90,14 +81,14 @@ class CoachService:
             response.message = str(e)
             return response
 
-        old = coach.image_path
+        previous = coach.image_path
         if not self.repository.update_image(db, username, name):
             delete_avatar(name)              # DB update failed: do not leave an orphan file
             response.status = "error"
             response.message = "Could not save image"
             return response
 
-        delete_avatar(old)                   # remove the previous photo
+        delete_avatar(previous)                   # remove the previous photo
         response.data = {"username": username, "image_path": name}
         return response
 
@@ -111,9 +102,9 @@ class CoachService:
             response.message = "User does not exist"
             return response
 
-        old = coach.image_path
+        previous = coach.image_path
         self.repository.update_image(db, username, None)
-        delete_avatar(old)
+        delete_avatar(previous)
 
         response.data = {"username": username, "image_path": None}
         return response

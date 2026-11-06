@@ -56,11 +56,13 @@ class LoginService:
         find_user = self.learner_repository.find_user(db, login_request, isPassword=True)
         print(find_user)
         if not find_user:
+            print(2)
             res.status = constants.ERROR
             res.message = utils.res_status_msg(constants.LOGIN, constants.ERROR, "Users does not exist or password not match")
             return res
         find_login = self.repository.find_login_learner(db, login_request["username"])
         if find_login:
+            print(3)
             res.status = constants.ERROR
             res.message = utils.res_status_msg(constants.LOGIN, constants.ERROR, "Login already exists")
             return res

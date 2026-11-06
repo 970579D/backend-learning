@@ -52,7 +52,6 @@ class CoachRepository:
 
 
     def find_assessment(self, db: Session, username: str):
-        # (Assessment, category_name) pairs, with the category read from the skill table
         return db.execute(
                 select(Assessment, Skill.category_name)
                 .join(Skill, Skill.skill_name == Assessment.assessment_skill)
