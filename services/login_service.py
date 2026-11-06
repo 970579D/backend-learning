@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from models.login_model import Login
 from models.response_model import Response_Model
 from models.user_model import User, UserRequest
+from repositories.admin_repository import AdminRepository
 from repositories.login_repository import LoginRepository
 from repositories.coach_repository import CoachRepository
 from repositories.learner_repository import LearnerRepository
@@ -17,6 +18,8 @@ class LoginService:
         self.repository = LoginRepository()
         self.coach_repository = CoachRepository()
         self.learner_repository = LearnerRepository()
+        self.admin_repository = AdminRepository()
+        
 
     def find_login(self, db: Session, username: str) -> Response_Model[Login]:
         res: Response_Model = Response_Model(status=constants.SUCCESS, message=utils.res_status_msg(constants.LOGIN, constants.SUCCESS))
@@ -24,7 +27,7 @@ class LoginService:
         res.data = login
         return res
 
-    def create_login_cocach(self, db: Session, login_request: UserRequest) -> Response_Model[Login]:
+    def create_login_coach(self, db: Session, login_request: UserRequest) -> Response_Model[Login]:
         res: Response_Model = Response_Model(status=constants.SUCCESS, message=utils.res_status_msg(constants.LOGIN, constants.SUCCESS))
 
         find_user = self.coach_repository.find_user(db, login_request, isPassword=True)
@@ -44,7 +47,7 @@ class LoginService:
             session=self.generate_session_id()
         )
 
-        result: User = self.repository.create_login_cocach(db, login_data)
+        result: User = self.repository.create_login_coach(db, login_data)
         if result:
             res.data = result
         return res 
@@ -77,6 +80,30 @@ class LoginService:
             res.data = result
         return res 
 
+    def create_login_admin(self, db: Session, login_request: UserRequest) -> Response_Model[Login]:
+        res: Response_Model = Response_Model(status=constants.SUCCESS, message=utils.res_status_msg(constants.LOGIN, constants.SUCCESS))
+
+        find_user = self.admin_repository.find_user(db, login_request, isPassword=True)
+        print(find_user)
+        if not find_user:
+            res.status = constants.ERROR
+            res.message = utils.res_status_msg(constants.LOGIN, constants.ERROR, "Users does not exist or password not match")
+            return res
+        find_login = self.repository.find_login_admin(db, login_request["username"])
+        if find_login:
+            res.status = constants.ERROR
+            res.message = utils.res_status_msg(constants.LOGIN, constants.ERROR, "Login already exists")
+            return res
+
+        login_data: Login = Login(
+            username=login_request["username"],
+            session=self.generate_session_id()
+        )
+
+        result: User = self.repository.create_login_admin(db, login_data)
+        if result:
+            res.data = result
+        return res 
 
     def logout_coach(self, db: Session, logout: dict) -> Response_Model[Login]:
         res: Response_Model = Response_Model(status=constants.SUCCESS, 
@@ -110,6 +137,23 @@ class LoginService:
                 res.message = utils.res_status_msg(constants.LOGOUT, constants.ERROR)
     
             return res
+
+
+    def logout_admin(self, db: Session, logout: dict) -> Response_Model[Login]:
+        res: Response_Model = Response_Model(status=constants.SUCCESS, 
+                                                  message=utils.res_status_msg(constants.LOGOUT, constants.SUCCESS))
+        find_login = self.repository.find_login_admin_by_session(db, logout["session"])
+        if not find_login:
+            res.status = constants.ERROR
+            res.message =  utils.res_status_msg(constants.LOGOUT, constants.ERROR, "Login session does not exist")
+            return res 
+
+        result: bool = self.repository.update_logout_admin(db, logout["session"])
+        if result == False:
+            res.status = constants.ERROR
+            res.message = utils.res_status_msg(constants.LOGOUT, constants.ERROR)
+
+        return res
 
     def generate_session_id(self) -> str:
         return str(uuid.uuid4())

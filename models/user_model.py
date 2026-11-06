@@ -69,6 +69,9 @@ class CoachProfile(User):
 class Learner(User):
     __tablename__ = "learner_profile"
 
+class AdminProfile(User):
+    __tablename__ = "admin_profile"
+
 class UserRequest(BaseModel):
     username: str
     password: str

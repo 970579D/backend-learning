@@ -3,7 +3,7 @@ from ast import stmt
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from models.login_model import CoachLogin, Login, LearnerLogin
+from models.login_model import CoachLogin, Login, LearnerLogin, AdminLogin
 
 class LoginRepository:
 
@@ -23,6 +23,14 @@ class LoginRepository:
     ).one_or_none()
         return result
 
+    def find_login_admin(self, db: Session, username: str) -> Login | None:
+        result = db.scalars(
+            select(AdminLogin)
+                .where(AdminLogin.username == username)
+                .where(AdminLogin.logout_date.is_(None))
+    ).one_or_none()
+        return result
+
     def find_login_coach_by_session(self, db: Session, session: str) -> Login:
         result: Login = list(
             db.scalars(select(CoachLogin).where(CoachLogin.session == session).where(CoachLogin.logout_date.is_(None)))
@@ -35,7 +43,13 @@ class LoginRepository:
         )
         return result
 
-    def create_login_cocach(
+    def find_login_admin_by_session(self, db: Session, session: str) -> Login:
+        result: Login = list(
+            db.scalars(select(AdminLogin).where(AdminLogin.session == session).where(AdminLogin.logout_date.is_(None)))
+        )
+        return result
+
+    def create_login_coach(
         self,
         db: Session,
         login: Login,
@@ -59,6 +73,18 @@ class LoginRepository:
         selected_login = self.find_login_learner(db, login.username)
         return selected_login
 
+    def create_login_admin(
+        self,
+        db: Session,
+        login: Login,
+    ) -> Login:
+        input_login = AdminLogin(username=login.username, session=login.session)
+        db.add(input_login)
+        db.commit()
+        db.refresh(input_login)
+        selected_login = self.find_login_admin(db, login.username)
+        return selected_login
+
     def update_logout_coach(self, db: Session, session: str) -> bool:
         result = db.execute(
             update(CoachLogin)
@@ -75,6 +101,16 @@ class LoginRepository:
             update(LearnerLogin)
             .where(LearnerLogin.session == session)
             .where(LearnerLogin.logout_date.is_(None))
+            .values(logout_date=func.now())
+        )
+        db.commit()
+        return result.rowcount > 0
+    
+    def update_logout_admin(self, db: Session, session: str) -> bool:
+        result = db.execute(
+            update(AdminLogin)
+            .where(AdminLogin.session == session)
+            .where(AdminLogin.logout_date.is_(None))
             .values(logout_date=func.now())
         )
         db.commit()

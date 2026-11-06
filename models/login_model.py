@@ -45,6 +45,8 @@ class Login(Base):
 class CoachLogin(Login):
     __tablename__ = "coach_login"
 
-
 class LearnerLogin(Login):
     __tablename__ = "learner_login"
+
+class AdminLogin(Login):
+    __tablename__ = "admin_login"

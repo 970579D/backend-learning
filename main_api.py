@@ -8,13 +8,13 @@ from database import init_db
 from controllers.coach_controller import router as coach_router
 from controllers.learner_controller import router as learner_router
 from controllers.login_controller import router as login_router
+from controllers.exam_controller import router as exam_controller
 from pathlib import Path
 from fastapi.staticfiles import StaticFiles
 
 Path("uploads/avatars").mkdir(parents=True, exist_ok=True)   # must exist before mounting
 
 from fastapi.middleware.cors import CORSMiddleware
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -36,3 +36,4 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 app.include_router(coach_router)
 app.include_router(learner_router)
 app.include_router(login_router)
+app.include_router(exam_controller)
