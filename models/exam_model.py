@@ -69,11 +69,9 @@ class CheckIn(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-
 class ExamSessionRequest(BaseModel):
     exam_time: datetime
     skill: str
-
 
 class ExamSessionStatusRequest(BaseModel):
     status: Literal["open", "closed", "finished"]
@@ -92,20 +90,9 @@ class CheckInRequest(BaseModel):
 class VerifyRequest(BaseModel):
     verify: bool = True
 
-
 class ExamResultRequest(BaseModel):
     booking_uuid: UUID
     score: int = Field(ge=0, le=100)
-
-
-class ExamSessionResponse(BaseModel):
-    uuid: UUID
-    exam_time: datetime
-    skill: str
-    status: str
-    booking_count: int = 0
-    booked: bool = False
-
 
 class BookingResponse(BaseModel):
     uuid: UUID
@@ -117,10 +104,18 @@ class BookingResponse(BaseModel):
     checked_in: bool
     verified: bool
 
-
 class ExamResultResponse(BaseModel):
     username: str
     skill: str
     round_attempt: int
     score: int
     status: str
+
+class ExamSessionResponse(BaseModel):
+    uuid: UUID
+    exam_time: datetime
+    skill: str
+    status: str
+    booking_count: int = 0
+    booked: bool = False
+    passed: bool = False

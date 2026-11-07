@@ -103,10 +103,17 @@ class ExamService:
         response: Response_Model = Response_Model(status="success", message="OK")
 
         rows = self.repository.list_open_sessions(db, username)
+        passed_skills: set[str] = self.repository.list_passed_skills(db, username)
         sessions: list[ExamSessionResponse] = []
 
         for session, booking_uuid in rows:
-            sessions.append(self.to_session_response(session, booked=booking_uuid is not None))
+            sessions.append(
+                self.to_session_response(
+                    session,
+                    booked=booking_uuid is not None,
+                    passed=session.skill in passed_skills,
+                )
+            )
 
         response.data = sessions
         return response
@@ -238,3 +245,14 @@ class ExamService:
 
         response.data = result
         return response
+
+    def to_session_response(self, session: ExamSession, booking_count: int = 0, booked: bool = False, passed: bool = False) -> ExamSessionResponse:
+        return ExamSessionResponse(
+            uuid=session.uuid,
+            exam_time=session.exam_time,
+            skill=session.skill,
+            status=session.status,
+            booking_count=booking_count,
+            booked=booked,
+            passed=passed,
+        )

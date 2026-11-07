@@ -131,3 +131,12 @@ class ExamRepository:
         db.commit()
         db.refresh(attempt)
         return attempt
+
+    def list_passed_skills(self, db: Session, username: str) -> set[str]:
+        return set(
+            db.scalars(
+                select(Assessment.assessment_skill).where(
+                    Assessment.username == username, Assessment.status == "pass"
+                )
+            ).all()
+        )

@@ -1,15 +1,19 @@
-from fastapi import APIRouter, Depends, File, UploadFile
 from uuid import UUID
+
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models.exam_model import ExamSessionRequest, ExamSessionStatusRequest, ExamResultRequest, VerifyRequest
-from models.user_model import Image
+from models.exam_model import (
+    BookingRequest, CheckInRequest, ExamResultRequest, ExamSessionRequest,
+    ExamSessionStatusRequest, VerifyRequest,
+)
 from services.exam_service import ExamService
 
 router = APIRouter(prefix="/exam", tags=["Exam"])
 
 exam_service = ExamService()
+
 
 @router.post("/session")
 def create_session(req: ExamSessionRequest, db: Session = Depends(get_db)):
@@ -34,3 +38,19 @@ def verify(booking_uuid: UUID, req: VerifyRequest, db: Session = Depends(get_db)
 @router.post("/result")
 def record_result(req: ExamResultRequest, db: Session = Depends(get_db)):
     return exam_service.record_result(db, req)
+
+@router.get("/open/{username}")
+def list_open(username: str, db: Session = Depends(get_db)):
+    return exam_service.list_open(db, username)
+
+@router.get("/booking/{username}")
+def list_my_bookings(username: str, db: Session = Depends(get_db)):
+    return exam_service.list_my_bookings(db, username)
+
+@router.post("/booking")
+def book(req: BookingRequest, db: Session = Depends(get_db)):
+    return exam_service.book(db, req)
+
+@router.post("/check-in")
+def check_in(req: CheckInRequest, db: Session = Depends(get_db)):
+    return exam_service.check_in(db, req)
