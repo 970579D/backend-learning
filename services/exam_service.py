@@ -42,12 +42,6 @@ class ExamService:
             verified=bool(check_in and check_in.verify),
         )
 
-    def skills(self, db: Session) -> Response_Model[list[str]]:
-        response: Response_Model = Response_Model(status="success", message="OK")
-
-        response.data = self.repository.list_skills(db)
-        return response
-
     def create_session(self, db: Session, req: ExamSessionRequest) -> Response_Model[ExamSessionResponse]:
         response: Response_Model = Response_Model(status="success", message="Exam session created successfully")
 

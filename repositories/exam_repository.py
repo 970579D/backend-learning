@@ -7,11 +7,7 @@ from models.exam_model import CheckIn, ExamBooking, ExamSession
 from models.skill_model import Assessment, AssessmentAttempt, Skill, coach_skill
 from models.user_model import CoachProfile
 
-
 class ExamRepository:
-
-    def list_skills(self, db: Session) -> list[str]:
-        return list(db.scalars(select(Skill.skill_name).order_by(Skill.skill_name)).all())
 
     def skill_exists(self, db: Session, skill: str) -> bool:
         return db.scalar(select(Skill.id).where(Skill.skill_name == skill)) is not None

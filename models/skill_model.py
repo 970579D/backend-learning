@@ -2,7 +2,7 @@ import uuid as uuid_lib
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import (
     BigInteger, CheckConstraint, Column, DateTime, ForeignKey, String, Table, UniqueConstraint, Uuid, func,
 )
@@ -129,6 +129,13 @@ class AssessmentAttempt(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+class CategoryRequest(BaseModel):
+    category_name: str = Field(min_length=1, max_length=100)
+
+class SkillRequest(BaseModel):
+    skill_name: str = Field(min_length=1, max_length=100)
+    category_name: str
+
 class AttemptData(BaseModel):
     id: int
     assessment_uuid: UUID
@@ -139,7 +146,6 @@ class AttemptData(BaseModel):
     create_date: datetime
     update_date: datetime
 
-
 class AssessmentResponse(BaseModel):
     id: int
     uuid: UUID
@@ -148,3 +154,15 @@ class AssessmentResponse(BaseModel):
     status: str
     total_attempt: int
     attemps: list[AttemptData] = []
+
+
+class CategoryResponse(BaseModel):
+    id: int
+    category_name: str
+    create_date: datetime
+
+class SkillResponse(BaseModel):
+    id: int
+    skill_name: str
+    category_name: str
+    create_date: datetime

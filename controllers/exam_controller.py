@@ -11,10 +11,6 @@ router = APIRouter(prefix="/exam", tags=["Exam"])
 
 exam_service = ExamService()
 
-@router.get("/skill")
-def skills(db: Session = Depends(get_db)):
-    return exam_service.skills(db)
-
 @router.post("/session")
 def create_session(req: ExamSessionRequest, db: Session = Depends(get_db)):
     return exam_service.create_session(db, req)
