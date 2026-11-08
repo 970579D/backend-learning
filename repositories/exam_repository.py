@@ -35,8 +35,10 @@ class ExamRepository:
             ).all()
         )
 
-    def create_session(self, db: Session, exam_time, skill: str, total_score: int) -> ExamSession:
-        session = ExamSession(exam_time=exam_time, skill=skill, total_score=total_score)
+    def create_session(self, db: Session, exam_time, skill: str, total_score: int, pass_percent: int) -> ExamSession:
+        session = ExamSession(
+            exam_time=exam_time, skill=skill, total_score=total_score, pass_percent=pass_percent
+        )
         db.add(session)
         db.commit()
         db.refresh(session)
@@ -159,9 +161,9 @@ class ExamRepository:
         if status == "pass":
             assessment.status = "pass"
             db.execute(
-                coach_skill.update()
-                .where(coach_skill.c.username == username, coach_skill.c.skill_name == skill)
-                .values(status="active")
+                pg_insert(coach_skill)
+                .values(username=username, skill_name=skill, status="active")
+                .on_conflict_do_update(constraint="uq_coach_skill", set_={"status": "active"})
             )
         elif assessment.status != "pass":
             assessment.status = "fail"

@@ -21,8 +21,8 @@ class ExamService:
     def __init__(self):
         self.repository = ExamRepository()
 
-    def pass_mark(self, total_score: int) -> int:
-        return -(-total_score * PASS_PERCENT // 100)
+    def pass_mark(self, total_score: int, pass_percent: int) -> int:
+        return -(-total_score * pass_percent // 100)
 
     def to_session_response(
         self, session: ExamSession, booking_count: int = 0, booked: bool = False, passed: bool = False
@@ -32,7 +32,8 @@ class ExamService:
             exam_time=session.exam_time,
             skill=session.skill,
             total_score=session.total_score,
-            pass_score=self.pass_mark(session.total_score),
+            pass_percent=session.pass_percent,
+            pass_score=self.pass_mark(session.total_score, session.pass_percent),
             status=session.status,
             booking_count=booking_count,
             booked=booked,
@@ -66,7 +67,9 @@ class ExamService:
             response.message = "Skill does not exist"
             return response
 
-        session: ExamSession = self.repository.create_session(db, exam_time, req.skill, req.total_score)
+        session: ExamSession = self.repository.create_session(
+            db, exam_time, req.skill, req.total_score, req.pass_percent
+        )
 
         response.data = self.to_session_response(session)
         return response
@@ -250,10 +253,10 @@ class ExamService:
                     skill=session.skill,
                     exam_time=session.exam_time,
                     total_score=session.total_score,
-                    pass_score=self.pass_mark(session.total_score),
                     assessed=attempt is not None,
                     round_attempt=attempt.round_attempt if attempt else None,
                     score=attempt.score if attempt else None,
+                    pass_score=self.pass_mark(session.total_score, session.pass_percent),
                     result=attempt.status if attempt else None,
                 )
             )
@@ -281,7 +284,7 @@ class ExamService:
             response.message = f"Score cannot be more than {session.total_score}"
             return response
 
-        status: str = "pass" if req.score >= self.pass_mark(session.total_score) else "fail"
+        status: str = "pass" if req.score >= self.pass_mark(session.total_score, session.pass_percent) else "fail"
         attempt = self.repository.add_attempt(
             db, booking.uuid, booking.username, session.skill, req.score, status
         )

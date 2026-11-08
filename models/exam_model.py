@@ -15,9 +15,11 @@ from database import Base
 
 class ExamSession(Base):
     __tablename__ = "exam_session"
+
     __table_args__ = (
         CheckConstraint("status IN ('open', 'closed', 'finished')", name="ck_exam_session_status"),
         CheckConstraint("total_score > 0", name="ck_exam_session_total_score"),
+        CheckConstraint("pass_percent BETWEEN 1 AND 100", name="ck_exam_session_pass_percent"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
@@ -29,6 +31,7 @@ class ExamSession(Base):
         index=True,
     )
     total_score: Mapped[int] = mapped_column(BigInteger, server_default="100")
+    pass_percent: Mapped[int] = mapped_column(BigInteger, server_default="50")
     status: Mapped[str] = mapped_column(String(20), server_default="open")
     create_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     update_date: Mapped[datetime] = mapped_column(
@@ -81,6 +84,7 @@ class ExamSessionRequest(BaseModel):
     exam_time: datetime
     skill: str
     total_score: int = Field(default=100, gt=0, le=1000)
+    pass_percent: int = Field(default=50, ge=1, le=100)
 
 
 class ExamSessionStatusRequest(BaseModel):
@@ -111,6 +115,7 @@ class ExamSessionResponse(BaseModel):
     exam_time: datetime
     skill: str
     total_score: int
+    pass_percent: int
     pass_score: int
     status: str
     booking_count: int = 0
