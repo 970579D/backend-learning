@@ -1,15 +1,15 @@
 from collections import defaultdict
-from urllib import response
+from uuid import UUID
 
 from fastapi import UploadFile
-from sqlalchemy import UUID
 from sqlalchemy.orm import Session
 
 from models.response_model import Response_Model
-from models.skill_model import Assessment, AssessmentAttempt, AssessmentResponse, AttemptData
-from models.user_model import Image, User, CoachProfile, UserResponse
+from models.skill_model import AssessmentResponse, AttemptData
+from models.user_model import CoachProfile, User, UserResponse
 from repositories.coach_repository import CoachRepository
 from utils.image_storage import delete_avatar, save_avatar
+
 
 class CoachService:
 
@@ -52,8 +52,8 @@ class CoachService:
 
         result: User = None
 
-        input_user = CoachProfile(username = user["username"], 
-                                  password = user["password"], 
+        input_user = CoachProfile(username = user["username"],
+                                  password = user["password"],
                                   firstname = user["firstname"],
                                   lastname = user["lastname"])
 
@@ -61,9 +61,8 @@ class CoachService:
         result = self.repository.find_user(db, user, False)
 
         response.data = result
-        
-        return response
 
+        return response
 
     def update_image(self, db: Session, username: str, file: UploadFile) -> Response_Model[dict]:
         response: Response_Model = Response_Model(status="success", message="Image updated successfully")
@@ -83,15 +82,14 @@ class CoachService:
 
         previous = coach.image_path
         if not self.repository.update_image(db, username, name):
-            delete_avatar(name)              # DB update failed: do not leave an orphan file
+            delete_avatar(name)
             response.status = "error"
             response.message = "Could not save image"
             return response
 
-        delete_avatar(previous)                   # remove the previous photo
+        delete_avatar(previous)
         response.data = {"username": username, "image_path": name}
         return response
-
 
     def delete_image(self, db: Session, username: str) -> Response_Model[dict]:
         response: Response_Model = Response_Model(status="success", message="Image removed")
@@ -118,27 +116,26 @@ class CoachService:
             response.message = "User does not exist"
             return response
 
-        assessments: AssessmentResponse = self.repository.find_assessment(db, username)
+        assessments = self.repository.find_assessment(db, username)
         if not assessments:
             response.data = []
             return response
-        
+
         skill_by_uuid: dict[UUID, str] = {a.uuid: a.assessment_skill for a, _ in assessments}
         attempts = self.repository.find_assessment_attempts(db, list(skill_by_uuid))
 
-        skill_by_uuid: dict[UUID, str] = {a.uuid: a.assessment_skill for a, _ in assessments}
+        attempt_data: dict[UUID, list[AttemptData]] = defaultdict(list)
+        assessment_data: list[AssessmentResponse] = []
 
-        attempt_data: dict[UUID, list[AttemptData]] = defaultdict(list[AttemptData])
-        assessment_data: list[AssessmentResponse] = list[AssessmentResponse]()
-
-        for t in attempts:
+        for t, total_score in attempts:
             attempt_data[t.assessment_uuid].append(
-                AttemptData(                                                  # CHANGED: response class, not the table class
+                AttemptData(
                     id=t.id,
                     assessment_uuid=t.assessment_uuid,
-                    assessment_skill=skill_by_uuid[t.assessment_uuid],        # CHANGED: new field, it was missing
+                    assessment_skill=skill_by_uuid[t.assessment_uuid],
                     round_attempt=t.round_attempt,
                     score=t.score,
+                    total_score=total_score or 100,
                     status=t.status,
                     create_date=t.create_date,
                     update_date=t.update_date,
@@ -154,7 +151,7 @@ class CoachService:
                     assessment_skill_category=category,
                     status=a.status,
                     total_attempt=a.total_attempt,
-                    attemps=attempt_data.get(a.uuid, []), #Input should be a valid dictionary or instance of AttemptData
+                    attemps=attempt_data.get(a.uuid, []),
                 )
             )
         response.data = assessment_data

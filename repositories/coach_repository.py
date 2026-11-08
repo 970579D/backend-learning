@@ -3,6 +3,7 @@ from unittest import result
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
+from models.exam_model import ExamBooking, ExamSession
 from models.user_model import User, CoachProfile
 from models.skill_model import AssessmentAttempt, Assessment, Skill, Skill, coach_skill
 from uuid import UUID
@@ -60,9 +61,11 @@ class CoachRepository:
                ).all()
 
 
-    def find_assessment_attempts(self, db: Session, assessment_uuids: list[UUID]) -> list[AssessmentAttempt]:
-        return db.scalars(
-            select(AssessmentAttempt)
+    def find_assessment_attempts(self, db: Session, assessment_uuids: list[UUID]):
+        return db.execute(
+            select(AssessmentAttempt, ExamSession.total_score)
+            .outerjoin(ExamBooking, ExamBooking.attempt_id == AssessmentAttempt.id)
+            .outerjoin(ExamSession, ExamSession.uuid == ExamBooking.session_uuid)
             .where(AssessmentAttempt.assessment_uuid.in_(assessment_uuids))
             .order_by(AssessmentAttempt.assessment_uuid, AssessmentAttempt.round_attempt)
         ).all()

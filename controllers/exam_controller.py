@@ -35,6 +35,10 @@ def list_session_bookings(session_uuid: UUID, db: Session = Depends(get_db)):
 def verify(booking_uuid: UUID, req: VerifyRequest, db: Session = Depends(get_db)):
     return exam_service.verify(db, booking_uuid, req)
 
+@router.get("/assessment")
+def list_assessments(db: Session = Depends(get_db)):
+    return exam_service.list_assessments(db)
+
 @router.post("/result")
 def record_result(req: ExamResultRequest, db: Session = Depends(get_db)):
     return exam_service.record_result(db, req)

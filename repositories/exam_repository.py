@@ -7,6 +7,7 @@ from models.exam_model import CheckIn, ExamBooking, ExamSession
 from models.skill_model import Assessment, AssessmentAttempt, Skill, coach_skill
 from models.user_model import CoachProfile
 
+
 class ExamRepository:
 
     def skill_exists(self, db: Session, skill: str) -> bool:
@@ -25,8 +26,17 @@ class ExamRepository:
             )
         )
 
-    def create_session(self, db: Session, exam_time, skill: str) -> ExamSession:
-        session = ExamSession(exam_time=exam_time, skill=skill)
+    def list_passed_skills(self, db: Session, username: str) -> set[str]:
+        return set(
+            db.scalars(
+                select(Assessment.assessment_skill).where(
+                    Assessment.username == username, Assessment.status == "pass"
+                )
+            ).all()
+        )
+
+    def create_session(self, db: Session, exam_time, skill: str, total_score: int) -> ExamSession:
+        session = ExamSession(exam_time=exam_time, skill=skill, total_score=total_score)
         db.add(session)
         db.commit()
         db.refresh(session)
@@ -53,7 +63,11 @@ class ExamRepository:
                 ExamBooking,
                 and_(ExamBooking.session_uuid == ExamSession.uuid, ExamBooking.username == username),
             )
-            .where(ExamSession.status == "open", ExamSession.exam_time > func.now())
+            .where(
+                ExamSession.status == "open",
+                ExamSession.exam_time > func.now(),
+                ExamBooking.uuid.is_(None),
+            )
             .order_by(ExamSession.exam_time)
         ).all()
 
@@ -76,6 +90,16 @@ class ExamRepository:
         rows = self._booking_rows(db, ExamBooking.uuid == booking_uuid)
         return rows[0] if rows else None
 
+    def list_attended(self, db: Session):
+        return db.execute(
+            select(ExamBooking, ExamSession, AssessmentAttempt)
+            .join(ExamSession, ExamSession.uuid == ExamBooking.session_uuid)
+            .join(CheckIn, CheckIn.exam_booking_uuid == ExamBooking.uuid)
+            .outerjoin(AssessmentAttempt, AssessmentAttempt.id == ExamBooking.attempt_id)
+            .where(CheckIn.verify.is_(True))
+            .order_by(ExamSession.exam_time.desc(), ExamBooking.username)
+        ).all()
+
     def create_booking(self, db: Session, username: str, session_uuid: UUID) -> ExamBooking:
         booking = ExamBooking(username=username, session_uuid=session_uuid)
         db.add(booking)
@@ -96,7 +120,19 @@ class ExamRepository:
         db.refresh(check_in)
         return check_in
 
-    def add_attempt(self, db: Session, username: str, skill: str, score: int, status: str) -> AssessmentAttempt:
+    def add_attempt(
+        self, db: Session, booking_uuid: UUID, username: str, skill: str, score: int, status: str
+    ) -> AssessmentAttempt | None:
+        booking = db.scalar(
+            select(ExamBooking)
+            .where(ExamBooking.uuid == booking_uuid)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        if booking is None or booking.attempt_id is not None:
+            db.rollback()
+            return None
+
         assessment = db.scalar(
             select(Assessment)
             .where(Assessment.username == username, Assessment.assessment_skill == skill)
@@ -117,6 +153,8 @@ class ExamRepository:
             status=status,
         )
         db.add(attempt)
+        db.flush()
+        booking.attempt_id = attempt.id
 
         if status == "pass":
             assessment.status = "pass"
@@ -131,12 +169,3 @@ class ExamRepository:
         db.commit()
         db.refresh(attempt)
         return attempt
-
-    def list_passed_skills(self, db: Session, username: str) -> set[str]:
-        return set(
-            db.scalars(
-                select(Assessment.assessment_skill).where(
-                    Assessment.username == username, Assessment.status == "pass"
-                )
-            ).all()
-        )

@@ -28,7 +28,6 @@ coach_skill = Table(
         nullable=False,
         index=True,
     ),
-    # active = exam passed, inactive = not passed yet
     Column("status", String(20), nullable=False, server_default="inactive"),
     UniqueConstraint("username", "skill_name", name="uq_coach_skill"),
     CheckConstraint("status IN ('active', 'inactive')", name="ck_coach_skill_status"),
@@ -39,7 +38,7 @@ class SkillCategory(Base):
     __tablename__ = "skill_category"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    category_name: Mapped[str] = mapped_column(String(100), unique=True)   # the key
+    category_name: Mapped[str] = mapped_column(String(100), unique=True)
     create_date: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -66,7 +65,7 @@ class Skill(Base):
     update_date: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
-    
+
     category: Mapped["SkillCategory"] = relationship(back_populates="skills", lazy="joined")
 
     coaches: Mapped[set["CoachProfile"]] = relationship(
@@ -75,8 +74,9 @@ class Skill(Base):
         passive_deletes=True,
     )
 
+
 class Assessment(Base):
-    
+
     __tablename__ = "assessment"
 
     __table_args__ = (
@@ -96,7 +96,6 @@ class Assessment(Base):
         ForeignKey("skill.skill_name", ondelete="CASCADE", onupdate="CASCADE"),
         index=True,
     )
-
     total_attempt: Mapped[int] = mapped_column(BigInteger, server_default="0")
     status: Mapped[str] = mapped_column(String(20), server_default="pending")
     create_date: Mapped[datetime] = mapped_column(
@@ -105,6 +104,7 @@ class Assessment(Base):
     update_date: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
 
 class AssessmentAttempt(Base):
 
@@ -119,9 +119,9 @@ class AssessmentAttempt(Base):
     assessment_uuid: Mapped[UUID] = mapped_column(
         ForeignKey("assessment.uuid", ondelete="CASCADE", onupdate="CASCADE"), index=True
     )
-    round_attempt: Mapped[int] = mapped_column(BigInteger)       # 1, 2, 3 ...
+    round_attempt: Mapped[int] = mapped_column(BigInteger)
     score: Mapped[int] = mapped_column(BigInteger)
-    status: Mapped[str] = mapped_column(String(20))              # pass / fail
+    status: Mapped[str] = mapped_column(String(20))
     create_date: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -129,12 +129,6 @@ class AssessmentAttempt(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-class CategoryRequest(BaseModel):
-    category_name: str = Field(min_length=1, max_length=100)
-
-class SkillRequest(BaseModel):
-    skill_name: str = Field(min_length=1, max_length=100)
-    category_name: str
 
 class AttemptData(BaseModel):
     id: int
@@ -142,9 +136,11 @@ class AttemptData(BaseModel):
     assessment_skill: str
     round_attempt: int
     score: int
+    total_score: int
     status: str
     create_date: datetime
     update_date: datetime
+
 
 class AssessmentResponse(BaseModel):
     id: int
@@ -156,10 +152,20 @@ class AssessmentResponse(BaseModel):
     attemps: list[AttemptData] = []
 
 
+class CategoryRequest(BaseModel):
+    category_name: str = Field(min_length=1, max_length=100)
+
+
 class CategoryResponse(BaseModel):
     id: int
     category_name: str
     create_date: datetime
+
+
+class SkillRequest(BaseModel):
+    skill_name: str = Field(min_length=1, max_length=100)
+    category_name: str
+
 
 class SkillResponse(BaseModel):
     id: int

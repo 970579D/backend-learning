@@ -5,13 +5,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from models.exam_model import (
-    BookingRequest, BookingResponse, CheckInRequest, ExamResultRequest, ExamResultResponse,
-    ExamSession, ExamSessionRequest, ExamSessionResponse, ExamSessionStatusRequest, VerifyRequest,
+    BookingRequest, BookingResponse, CheckInRequest, ExamAssessmentResponse, ExamResultRequest,
+    ExamResultResponse, ExamSession, ExamSessionRequest, ExamSessionResponse,
+    ExamSessionStatusRequest, VerifyRequest,
 )
 from models.response_model import Response_Model
 from repositories.exam_repository import ExamRepository
 
-PASS_SCORE = 50
+PASS_PERCENT = 50
 CHECKIN_OPENS_BEFORE = timedelta(minutes=30)
 
 
@@ -20,14 +21,22 @@ class ExamService:
     def __init__(self):
         self.repository = ExamRepository()
 
-    def to_session_response(self, session: ExamSession, booking_count: int = 0, booked: bool = False) -> ExamSessionResponse:
+    def pass_mark(self, total_score: int) -> int:
+        return -(-total_score * PASS_PERCENT // 100)
+
+    def to_session_response(
+        self, session: ExamSession, booking_count: int = 0, booked: bool = False, passed: bool = False
+    ) -> ExamSessionResponse:
         return ExamSessionResponse(
             uuid=session.uuid,
             exam_time=session.exam_time,
             skill=session.skill,
+            total_score=session.total_score,
+            pass_score=self.pass_mark(session.total_score),
             status=session.status,
             booking_count=booking_count,
             booked=booked,
+            passed=passed,
         )
 
     def to_booking_response(self, booking, session, check_in) -> BookingResponse:
@@ -40,6 +49,7 @@ class ExamService:
             session_status=session.status,
             checked_in=check_in is not None,
             verified=bool(check_in and check_in.verify),
+            assessed=booking.attempt_id is not None,
         )
 
     def create_session(self, db: Session, req: ExamSessionRequest) -> Response_Model[ExamSessionResponse]:
@@ -56,7 +66,7 @@ class ExamService:
             response.message = "Skill does not exist"
             return response
 
-        session: ExamSession = self.repository.create_session(db, exam_time, req.skill)
+        session: ExamSession = self.repository.create_session(db, exam_time, req.skill, req.total_score)
 
         response.data = self.to_session_response(session)
         return response
@@ -73,7 +83,9 @@ class ExamService:
         response.data = sessions
         return response
 
-    def set_session_status(self, db: Session, session_uuid: UUID, req: ExamSessionStatusRequest) -> Response_Model[ExamSessionResponse]:
+    def set_session_status(
+        self, db: Session, session_uuid: UUID, req: ExamSessionStatusRequest
+    ) -> Response_Model[ExamSessionResponse]:
         response: Response_Model = Response_Model(status="success", message="Status updated successfully")
 
         session: ExamSession = self.repository.find_session(db, session_uuid)
@@ -168,7 +180,9 @@ class ExamService:
         return response
 
     def check_in(self, db: Session, req: CheckInRequest) -> Response_Model[BookingResponse]:
-        response: Response_Model = Response_Model(status="success", message="Checked in, wait for the admin to verify you")
+        response: Response_Model = Response_Model(
+            status="success", message="Checked in, wait for the admin to verify you"
+        )
 
         row = self.repository.find_booking_row(db, req.booking_uuid)
         if row is None or row[0].username != req.username:
@@ -187,10 +201,10 @@ class ExamService:
             response.message = "This exam session is finished"
             return response
 
-        if datetime.now(timezone.utc) < session.exam_time - CHECKIN_OPENS_BEFORE:
-            response.status = "error"
-            response.message = "Check-in opens 30 minutes before the exam"
-            return response
+        # if datetime.now(timezone.utc) < session.exam_time - CHECKIN_OPENS_BEFORE:
+        #     response.status = "error"
+        #     response.message = "Check-in opens 30 minutes before the exam"
+        #     return response
 
         check_in = self.repository.create_check_in(db, booking.uuid)
 
@@ -212,9 +226,39 @@ class ExamService:
             response.message = "This coach has not checked in yet"
             return response
 
+        if booking.attempt_id is not None and not req.verify:
+            response.status = "error"
+            response.message = "The result is already saved, verification cannot be removed"
+            return response
+
         check_in = self.repository.set_verify(db, check_in, req.verify)
 
         response.data = self.to_booking_response(booking, session, check_in)
+        return response
+
+    def list_assessments(self, db: Session) -> Response_Model[list[ExamAssessmentResponse]]:
+        response: Response_Model = Response_Model(status="success", message="OK")
+
+        rows = self.repository.list_attended(db)
+        items: list[ExamAssessmentResponse] = []
+
+        for booking, session, attempt in rows:
+            items.append(
+                ExamAssessmentResponse(
+                    booking_uuid=booking.uuid,
+                    username=booking.username,
+                    skill=session.skill,
+                    exam_time=session.exam_time,
+                    total_score=session.total_score,
+                    pass_score=self.pass_mark(session.total_score),
+                    assessed=attempt is not None,
+                    round_attempt=attempt.round_attempt if attempt else None,
+                    score=attempt.score if attempt else None,
+                    result=attempt.status if attempt else None,
+                )
+            )
+
+        response.data = items
         return response
 
     def record_result(self, db: Session, req: ExamResultRequest) -> Response_Model[ExamResultResponse]:
@@ -232,27 +276,28 @@ class ExamService:
             response.message = "This coach is not verified for this exam"
             return response
 
-        status: str = "pass" if req.score >= PASS_SCORE else "fail"
-        attempt = self.repository.add_attempt(db, booking.username, session.skill, req.score, status)
+        if req.score > session.total_score:
+            response.status = "error"
+            response.message = f"Score cannot be more than {session.total_score}"
+            return response
+
+        status: str = "pass" if req.score >= self.pass_mark(session.total_score) else "fail"
+        attempt = self.repository.add_attempt(
+            db, booking.uuid, booking.username, session.skill, req.score, status
+        )
+        if attempt is None:
+            response.status = "error"
+            response.message = "The result for this booking is already saved"
+            return response
 
         result: ExamResultResponse = ExamResultResponse(
             username=booking.username,
             skill=session.skill,
             round_attempt=attempt.round_attempt,
             score=attempt.score,
+            total_score=session.total_score,
             status=attempt.status,
         )
 
         response.data = result
         return response
-
-    def to_session_response(self, session: ExamSession, booking_count: int = 0, booked: bool = False, passed: bool = False) -> ExamSessionResponse:
-        return ExamSessionResponse(
-            uuid=session.uuid,
-            exam_time=session.exam_time,
-            skill=session.skill,
-            status=session.status,
-            booking_count=booking_count,
-            booked=booked,
-            passed=passed,
-        )
