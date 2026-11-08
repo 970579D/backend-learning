@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, select, pg_insert
 from sqlalchemy.orm import Session
 
 from models.exam_model import CheckIn, ExamBooking, ExamSession
