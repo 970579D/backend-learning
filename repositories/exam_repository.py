@@ -1,7 +1,8 @@
 from uuid import UUID
 
-from sqlalchemy import and_, func, select, pg_insert
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from models.exam_model import CheckIn, ExamBooking, ExamSession
 from models.skill_model import Assessment, AssessmentAttempt, Skill, coach_skill

@@ -91,3 +91,7 @@ class UserResponse(BaseModel):
     create_date: datetime
     update_date: datetime
     skills: list[dict] | None = None
+
+class NameRequest(BaseModel):
+    firstname: str
+    lastname: str
