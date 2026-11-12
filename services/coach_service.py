@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from models.response_model import Response_Model
 from models.skill_model import AssessmentResponse, AttemptData
-from models.user_model import CoachProfile, User, UserResponse
+from models.user_model import CoachProfile, NameRequest, User, UserResponse
 from repositories.coach_repository import CoachRepository
 from utils.image_storage import delete_avatar, save_avatar
 
@@ -156,4 +156,28 @@ class CoachService:
             )
         response.data = assessment_data
 
+        return response
+
+    def update_name(self, db: Session, username: str, req: NameRequest) -> Response_Model[dict]:
+        response: Response_Model = Response_Model(status="success", message="Name updated successfully")
+
+        coach = self.repository.find_user(db, {"username": username}, isPassword=False)
+        if coach is None:
+            response.status = "error"
+            response.message = "User does not exist"
+            return response
+
+        firstname: str = req.firstname.strip()
+        lastname: str = req.lastname.strip()
+        if not firstname or not lastname:
+            response.status = "error"
+            response.message = "First name and last name are required"
+            return response
+
+        if not self.repository.update_name(db, username, firstname, lastname):
+            response.status = "error"
+            response.message = "Could not update name"
+            return response
+
+        response.data = {"username": username, "firstname": firstname, "lastname": lastname}
         return response

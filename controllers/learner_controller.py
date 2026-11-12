@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from services.learner_service import LearnerService
-from models.user_model import Image
+from models.user_model import NameRequest
 
 router = APIRouter(prefix="/learner", tags=["Learner"])
 
@@ -24,3 +24,7 @@ def update_coach_image(username: str, file: UploadFile = File(...), db: Session 
 @router.delete("/image/{username}")
 def delete_coach_image(username: str, db: Session = Depends(get_db)):
     return learner_service.delete_image(db, username)
+
+@router.put("/name/{username}")
+def update_coach_name(username: str, req: NameRequest, db: Session = Depends(get_db)):
+    return learner_service.update_name(db, username, req)

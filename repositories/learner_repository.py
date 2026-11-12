@@ -36,3 +36,12 @@ class LearnerRepository:
         )
         db.commit()
         return result.rowcount > 0
+
+    def update_name(self, db: Session, username: str, firstname: str, lastname: str) -> bool:
+        result = db.execute(
+            update(Learner)
+            .where(Learner.username == username)
+            .values(firstname=firstname, lastname=lastname)
+        )
+        db.commit()
+        return result.rowcount > 0
