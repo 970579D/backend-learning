@@ -1,7 +1,11 @@
+from uuid import UUID
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from models.skill_model import Skill, SkillCategory
+from models.exam_model import ExamBooking, ExamSession
+from models.skill_model import Assessment, AssessmentAttempt, Skill, SkillCategory
+from models.user_model import CoachProfile
 
 
 class SkillRepository:
@@ -31,3 +35,21 @@ class SkillRepository:
         db.commit()
         db.refresh(skill)
         return skill
+
+    def find_skill_assessments(self, db: Session, skill_name: str):
+        return db.execute(
+            select(Assessment, CoachProfile)
+            .join(CoachProfile, CoachProfile.username == Assessment.username)
+            .where(
+                Assessment.assessment_skill == skill_name,
+                Assessment.status.in_(["pass", "fail"]),
+        )
+    ).all()
+
+    def find_attempts_with_total(self, db: Session, assessment_uuids: list[UUID]):
+        return db.execute(
+            select(AssessmentAttempt, ExamSession.total_score)
+            .outerjoin(ExamBooking, ExamBooking.attempt_id == AssessmentAttempt.id)
+            .outerjoin(ExamSession, ExamSession.uuid == ExamBooking.session_uuid)
+            .where(AssessmentAttempt.assessment_uuid.in_(assessment_uuids))
+    ).all()

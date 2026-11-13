@@ -70,11 +70,4 @@ class CoachRepository:
             .order_by(AssessmentAttempt.assessment_uuid, AssessmentAttempt.round_attempt)
         ).all()
 
-    def update_name(self, db: Session, username: str, firstname: str, lastname: str) -> bool:
-        result = db.execute(
-            update(CoachProfile)
-            .where(CoachProfile.username == username)
-            .values(firstname=firstname, lastname=lastname)
-        )
-        db.commit()
-        return result.rowcount > 0
+ 

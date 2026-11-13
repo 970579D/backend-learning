@@ -1,9 +1,11 @@
+from uuid import UUID
+
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from models.response_model import Response_Model
 from models.skill_model import (
-    CategoryRequest, CategoryResponse, Skill, SkillCategory, SkillRequest, SkillResponse,
+    CategoryRequest, CategoryResponse, Skill, SkillCategory, SkillCoachResponse, SkillRequest, SkillResponse,
 )
 from repositories.skill_repository import SkillRepository
 
@@ -100,4 +102,48 @@ class SkillService:
             return response
 
         response.data = self.to_skill_response(skill)
+        return response
+
+    def list_skill_coaches(self, db: Session, skill_name: str) -> Response_Model[list[SkillCoachResponse]]:
+        response: Response_Model = Response_Model(status="success", message="OK")
+
+        if self.repository.find_skill(db, skill_name) is None:
+            response.status = "error"
+            response.message = "Skill does not exist"
+            return response
+
+        rows = self.repository.find_skill_assessments(db, skill_name)
+        if not rows:
+            response.data = []
+            return response
+
+        attempts = self.repository.find_attempts_with_total(db, [a.uuid for a, _ in rows])
+
+        best: dict[UUID, tuple[int, int]] = {}
+        for attempt, total in attempts:
+            total_score: int = total or 100
+            current = best.get(attempt.assessment_uuid)
+            if current is None or attempt.score * current[1] > current[0] * total_score:
+                best[attempt.assessment_uuid] = (attempt.score, total_score)
+
+        coaches: list[SkillCoachResponse] = []
+        for assessment, coach in rows:
+            score, total_score = best.get(assessment.uuid, (0, 100))
+            coaches.append(
+                SkillCoachResponse(
+                    username=coach.username,
+                    firstname=coach.firstname,
+                    lastname=coach.lastname,
+                    image_path=coach.image_path,
+                    status=assessment.status,
+                    best_score=score,
+                    best_total_score=total_score,
+                    best_percent=round(score * 100 / total_score),
+                    total_attempt=assessment.total_attempt,
+                )
+            )
+
+        coaches.sort(key=lambda c: (c.status != "pass", -c.best_percent, -c.best_score, c.username))
+
+        response.data = coaches
         return response

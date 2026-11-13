@@ -1,3 +1,4 @@
+from typing import Optional
 import uuid as uuid_lib
 from datetime import datetime
 from uuid import UUID
@@ -172,3 +173,14 @@ class SkillResponse(BaseModel):
     skill_name: str
     category_name: str
     create_date: datetime
+
+class SkillCoachResponse(BaseModel):
+    username: str
+    firstname: str
+    lastname: str
+    image_path: Optional[str] = None
+    status: str
+    best_score: int
+    best_total_score: int
+    best_percent: int
+    total_attempt: int

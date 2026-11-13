@@ -24,3 +24,7 @@ def list_skills(db: Session = Depends(get_db)):
 @router.post("")
 def create_skill(req: SkillRequest, db: Session = Depends(get_db)):
     return skill_service.create_skill(db, req)
+
+@router.get("/coach")
+def list_skill_coaches(skill_name: str, db: Session = Depends(get_db)):
+    return skill_service.list_skill_coaches(db, skill_name)
