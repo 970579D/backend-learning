@@ -1,32 +1,27 @@
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from models.user_model import User, Learner
+from models.requirement_model import LearnerRequirement
+from models.user_model import Learner
+
 
 class LearnerRepository:
 
-    def find_user(self, db: Session, user: Learner, isPassword: bool) -> User:
-        user: User | None = db.scalars(select(Learner).where(
-        Learner.username == user["username"],
-        Learner.password == user["password"]
-    ) if isPassword else
-    select(Learner).where(
-        Learner.username == user["username"]
-    )).one_or_none()
-        
-        return user
+    def find_user(self, db: Session, user, isPassword: bool) -> Learner | None:
+        username: str = user["username"] if isinstance(user, dict) else user.username
+        query = select(Learner).where(Learner.username == username)
 
-    def create(
-        self,
-        db: Session,
-        user: User,
-    ) -> bool:
-        
-        db.add(user)
+        if isPassword:
+            password: str = user["password"] if isinstance(user, dict) else user.password
+            query = query.where(Learner.password == password)
+
+        return db.scalars(query).one_or_none()
+
+    def create_with_requirement(self, db: Session, learner: Learner, requirement: LearnerRequirement) -> None:
+        db.add(learner)
+        db.flush()
+        db.add(requirement)
         db.commit()
-        db.refresh(user)
-
-        return True
 
     def update_image(self, db: Session, username: str, image_path: str | None) -> bool:
         result = db.execute(

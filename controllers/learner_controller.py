@@ -2,29 +2,31 @@ from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.orm import Session
 
 from database import get_db
-from services.learner_service import LearnerService
+from models.requirement_model import LearnerRegisterRequest
 from models.user_model import NameRequest
+from services.learner_service import LearnerService
 
 router = APIRouter(prefix="/learner", tags=["Learner"])
 
 learner_service = LearnerService()
+
 
 @router.get("/{username}")
 def find_user(username: str, db: Session = Depends(get_db)):
     return learner_service.find_user(db, username)
 
 @router.post("/")
-def create(user: dict, db: Session = Depends(get_db)):
-    return learner_service.create(db, user)
+def create(req: LearnerRegisterRequest, db: Session = Depends(get_db)):
+    return learner_service.create(db, req)
 
 @router.put("/image/{username}")
-def update_coach_image(username: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
+def update_learner_image(username: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
     return learner_service.update_image(db, username, file)
 
 @router.delete("/image/{username}")
-def delete_coach_image(username: str, db: Session = Depends(get_db)):
+def delete_learner_image(username: str, db: Session = Depends(get_db)):
     return learner_service.delete_image(db, username)
 
 @router.put("/name/{username}")
-def update_coach_name(username: str, req: NameRequest, db: Session = Depends(get_db)):
+def update_learner_name(username: str, req: NameRequest, db: Session = Depends(get_db)):
     return learner_service.update_name(db, username, req)

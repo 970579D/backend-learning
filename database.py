@@ -51,6 +51,7 @@ def init_db() -> None:
     import models.user_model   # coach_profile, learner_profile
     import models.skill_model  # skill_category, skill, coach_skill
     import models.exam_model
+    import models.requirement_model
 
     Base.metadata.create_all(bind=engine)
 

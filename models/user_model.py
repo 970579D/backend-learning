@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 from pydantic import BaseModel
 from sqlalchemy import BigInteger, Column, String, DateTime, text
 from sqlalchemy.orm import Mapped, relationship
@@ -95,3 +96,11 @@ class UserResponse(BaseModel):
 class NameRequest(BaseModel):
     firstname: str
     lastname: str
+
+class LearnerResponse(BaseModel):
+    username: str
+    firstname: str
+    lastname: str
+    image_path: Optional[str] = None
+    create_date: datetime
+    update_date: datetime

@@ -57,6 +57,13 @@ class ExamService:
         response: Response_Model = Response_Model(status="success", message="Exam session created successfully")
 
         exam_time: datetime = req.exam_time if req.exam_time.tzinfo else req.exam_time.replace(tzinfo=timezone.utc)
+
+        utc_time: datetime = exam_time.astimezone(timezone.utc)
+        if utc_time.minute % 15 != 0 or utc_time.second != 0 or utc_time.microsecond != 0:
+            response.status = "error"
+            response.message = "Exam time must be on a 15-minute step (00, 15, 30, 45)"
+            return response
+
         if exam_time <= datetime.now(timezone.utc):
             response.status = "error"
             response.message = "Exam time must be in the future"
