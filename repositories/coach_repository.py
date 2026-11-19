@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from models.exam_model import ExamBooking, ExamSession
 from models.user_model import User, CoachProfile
+from models.coach_detail_model import CoachDetail
 from models.skill_model import AssessmentAttempt, Assessment, Skill, Skill, coach_skill
 from uuid import UUID
 class CoachRepository:
@@ -70,4 +71,9 @@ class CoachRepository:
             .order_by(AssessmentAttempt.assessment_uuid, AssessmentAttempt.round_attempt)
         ).all()
 
+    def create_with_detail(self, db: Session, coach: CoachProfile, detail: CoachDetail) -> None:
+        db.add(coach)
+        db.flush()
+        db.add(detail)
+        db.commit()
  

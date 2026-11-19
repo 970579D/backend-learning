@@ -10,6 +10,7 @@ from controllers.learner_controller import router as learner_router
 from controllers.login_controller import router as login_router
 from controllers.exam_controller import router as exam_controller
 from controllers.skill_controller import router as skill_router
+from controllers.request_controller import router as request_router
 from pathlib import Path
 from fastapi.staticfiles import StaticFiles
 
@@ -39,3 +40,4 @@ app.include_router(learner_router)
 app.include_router(login_router)
 app.include_router(exam_controller)
 app.include_router(skill_router)
+app.include_router(request_router)

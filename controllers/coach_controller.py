@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models.user_model import NameRequest
+from models.coach_detail_model import CoachRegisterRequest
 from services.coach_service import CoachService
 
 router = APIRouter(prefix="/coach", tags=["Coach"])
@@ -14,7 +15,7 @@ def find_user(username: str, db: Session = Depends(get_db)):
     return coach_service.find_user(db, username)
 
 @router.post("/")
-def create(user: dict, db: Session = Depends(get_db)):
+def create(user: CoachRegisterRequest, db: Session = Depends(get_db)):
     return coach_service.create(db, user)
 
 @router.put("/image/{username}")
@@ -32,3 +33,7 @@ def find_coach_assessment(username: str, db: Session = Depends(get_db)):
 @router.put("/name/{username}")
 def update_coach_name(username: str, req: NameRequest, db: Session = Depends(get_db)):
     return coach_service.update_name(db, username, req)
+
+@router.post("/")
+def create(req: CoachRegisterRequest, db: Session = Depends(get_db)):
+    return coach_service.create(db, req)
