@@ -49,4 +49,5 @@ class CoachDetailData(BaseModel):
 
 
 class CoachRegisterRequest(UserRequest):
+    phone: str
     detail: CoachDetailData

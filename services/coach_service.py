@@ -11,6 +11,7 @@ from models.skill_model import AssessmentResponse, AttemptData
 from models.user_model import CoachProfile, NameRequest, User, UserResponse
 from repositories.coach_repository import CoachRepository
 from utils.image_storage import delete_avatar, save_avatar
+from utils.phone import normalize_phone
 
 MAX_ABOUT = 1000
 MAX_COURSE = 2000
@@ -37,6 +38,7 @@ class CoachService:
             username=coach.username,
             firstname=coach.firstname,
             lastname=coach.lastname,
+            phone=coach.phone,
             status=coach.status,
             image_path=coach.image_path,
             create_date=coach.create_date,
@@ -54,6 +56,12 @@ class CoachService:
         if existing_user:
             response.status = "error"
             response.message = "User already exists"
+            return response
+
+        phone: str | None = normalize_phone(req.phone)
+        if phone is None:
+            response.status = "error"
+            response.message = "Phone number must be 9 to 15 digits"
             return response
 
         about_coach: str = req.detail.about_coach.strip()
@@ -88,6 +96,7 @@ class CoachService:
             password=req.password,
             firstname=req.firstname,
             lastname=req.lastname,
+            phone=phone,
         )
         detail: CoachDetail = CoachDetail(
             username=req.username,
@@ -112,6 +121,7 @@ class CoachService:
             username=created.username,
             firstname=created.firstname,
             lastname=created.lastname,
+            phone=created.phone,
             status=created.status,
             image_path=created.image_path,
             create_date=created.create_date,

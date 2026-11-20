@@ -38,6 +38,11 @@ class User(Base):
         nullable=False,
     )
 
+    phone: Mapped[Optional[str]] = Column(
+        String(20),
+        nullable=True,
+    )
+
     image_path: Mapped[str] = Column(
         String(255),
         nullable=True,
@@ -88,6 +93,7 @@ class UserResponse(BaseModel):
     firstname: str
     lastname: str
     status: str | None = None
+    phone: Optional[str] = None
     image_path: str | None = None
     create_date: datetime
     update_date: datetime
@@ -101,6 +107,7 @@ class LearnerResponse(BaseModel):
     username: str
     firstname: str
     lastname: str
+    phone: Optional[str] = None
     image_path: Optional[str] = None
     create_date: datetime
     update_date: datetime

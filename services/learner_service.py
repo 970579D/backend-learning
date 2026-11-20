@@ -7,6 +7,7 @@ from models.response_model import Response_Model
 from models.user_model import Learner, LearnerResponse, NameRequest
 from repositories.learner_repository import LearnerRepository
 from utils.image_storage import delete_avatar, save_avatar
+from utils.phone import normalize_phone
 
 
 class LearnerService:
@@ -27,6 +28,7 @@ class LearnerService:
             username=learner.username,
             firstname=learner.firstname,
             lastname=learner.lastname,
+            phone=learner.phone,
             image_path=learner.image_path,
             create_date=learner.create_date,
             update_date=learner.update_date,
@@ -38,10 +40,16 @@ class LearnerService:
     def create(self, db: Session, req: LearnerRegisterRequest) -> Response_Model[LearnerResponse]:
         response: Response_Model = Response_Model(status="success", message="User created successfully")
 
-        existing_user = self.repository.find_user(db, req, isPassword=False)
+        existing_user = self.repository.find_user(db, {"username": req.username}, isPassword=False)
         if existing_user:
             response.status = "error"
             response.message = "User already exists"
+            return response
+
+        phone: str | None = normalize_phone(req.phone)
+        if phone is None:
+            response.status = "error"
+            response.message = "Phone number must be 9 to 15 digits"
             return response
 
         learner: Learner = Learner(
@@ -49,6 +57,7 @@ class LearnerService:
             password=req.password,
             firstname=req.firstname,
             lastname=req.lastname,
+            phone=phone,
         )
         requirement: LearnerRequirement = LearnerRequirement(
             username=req.username,
@@ -63,12 +72,13 @@ class LearnerService:
             response.message = "User already exists"
             return response
 
-        created: Learner = self.repository.find_user(db, req, isPassword=False)
+        created: Learner = self.repository.find_user(db, {"username": req.username}, isPassword=False)
 
         result: LearnerResponse = LearnerResponse(
             username=created.username,
             firstname=created.firstname,
             lastname=created.lastname,
+            phone=created.phone,
             image_path=created.image_path,
             create_date=created.create_date,
             update_date=created.update_date,

@@ -74,4 +74,5 @@ class RequirementData(BaseModel):
 
 
 class LearnerRegisterRequest(UserRequest):
+    phone: str
     requirement: RequirementData
