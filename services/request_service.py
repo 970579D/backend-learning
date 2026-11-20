@@ -5,8 +5,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from models.request_model import (
-    CoachResponseCreate, CoachResponseResult, LearnerInfo, LearnerRequest, LearnerRequestCreate,
-    LearnerRequestResponse, MatchRequestResponse, RequirementResponse, ResponderResponse,
+    LearnerInfo, LearnerMatchResponse, LearnerRequest, LearnerRequestCreate, LearnerRequestResponse,
+    MatchCoachResponse, MatchRequestResponse, PhoneResponse, RequirementResponse,
 )
 from models.requirement_model import LearnerRequirement
 from models.response_model import Response_Model
@@ -20,15 +20,12 @@ class RequestService:
     def __init__(self):
         self.repository = RequestRepository()
 
-    def to_learner_request(
-        self, request: LearnerRequest, responses: list[ResponderResponse]
-    ) -> LearnerRequestResponse:
+    def to_learner_request(self, request: LearnerRequest) -> LearnerRequestResponse:
         return LearnerRequestResponse(
             uuid=request.uuid,
             skill=request.skill,
             description=request.description,
             create_date=request.create_date,
-            responses=responses,
         )
 
     def to_requirement(self, requirement: LearnerRequirement | None) -> RequirementResponse | None:
@@ -44,6 +41,20 @@ class RequestService:
             place_to_learn=requirement.place_to_learn,
             province=requirement.province,
         )
+
+    def best_scores(
+        self, db: Session, skills: list[str], usernames: list[str]
+    ) -> dict[tuple[str, str], tuple[int, int, int]]:
+        best: dict[tuple[str, str], tuple[int, int, int]] = {}
+        if not usernames:
+            return best
+
+        for username, skill, total_attempt, score, total in self.repository.find_scores(db, skills, usernames):
+            total_score: int = total or 100
+            current = best.get((username, skill))
+            if current is None or score * current[1] > current[0] * total_score:
+                best[(username, skill)] = (score, total_score, total_attempt)
+        return best
 
     def create_request(self, db: Session, req: LearnerRequestCreate) -> Response_Model[LearnerRequestResponse]:
         response: Response_Model = Response_Model(
@@ -76,10 +87,26 @@ class RequestService:
             response.message = "You have already requested this skill"
             return response
 
-        response.data = self.to_learner_request(request, [])
+        response.data = self.to_learner_request(request)
         return response
 
     def find_learner_requests(self, db: Session, username: str) -> Response_Model[list[LearnerRequestResponse]]:
+        response: Response_Model = Response_Model(status="success", message="OK")
+
+        learner = self.repository.find_learner(db, username)
+        if learner is None:
+            response.status = "error"
+            response.message = "User does not exist"
+            return response
+
+        items: list[LearnerRequestResponse] = []
+        for request in self.repository.find_learner_requests(db, username):
+            items.append(self.to_learner_request(request))
+
+        response.data = items
+        return response
+
+    def find_learner_match(self, db: Session, username: str) -> Response_Model[list[LearnerMatchResponse]]:
         response: Response_Model = Response_Model(status="success", message="OK")
 
         learner = self.repository.find_learner(db, username)
@@ -93,24 +120,46 @@ class RequestService:
             response.data = []
             return response
 
-        rows = self.repository.find_responders(db, [r.uuid for r in requests])
+        skills: list[str] = list({r.skill for r in requests})
+        rows = self.repository.find_matching_coaches(db, skills)
+        usernames: list[str] = list({coach.username for _, coach, _ in rows})
+        best = self.best_scores(db, skills, usernames)
 
-        by_request: dict[UUID, list[ResponderResponse]] = defaultdict(list)
-        for coach_response, coach in rows:
-            by_request[coach_response.request_uuid].append(
-                ResponderResponse(
-                    uuid=coach_response.uuid,
+        by_skill: dict[str, list[MatchCoachResponse]] = defaultdict(list)
+        for skill, coach, detail in rows:
+            score, total_score, total_attempt = best.get((coach.username, skill), (0, 100, 0))
+            by_skill[skill].append(
+                MatchCoachResponse(
                     username=coach.username,
                     firstname=coach.firstname,
                     lastname=coach.lastname,
                     image_path=coach.image_path,
-                    create_date=coach_response.create_date,
+                    about_coach=detail.about_coach if detail else None,
+                    course_description=detail.course_description if detail else None,
+                    cost=detail.cost if detail else None,
+                    place_to_coach=detail.place_to_coach if detail else None,
+                    coaching_mode=detail.coaching_mode if detail else None,
+                    best_score=score,
+                    best_total_score=total_score,
+                    best_percent=round(score * 100 / total_score),
+                    total_attempt=total_attempt,
                 )
             )
 
-        items: list[LearnerRequestResponse] = []
+        for coaches in by_skill.values():
+            coaches.sort(key=lambda c: (-c.best_percent, -c.best_score, c.username))
+
+        items: list[LearnerMatchResponse] = []
         for request in requests:
-            items.append(self.to_learner_request(request, by_request.get(request.uuid, [])))
+            items.append(
+                LearnerMatchResponse(
+                    uuid=request.uuid,
+                    skill=request.skill,
+                    description=request.description,
+                    create_date=request.create_date,
+                    coaches=by_skill.get(request.skill, []),
+                )
+            )
 
         response.data = items
         return response
@@ -124,22 +173,8 @@ class RequestService:
             response.message = "User does not exist"
             return response
 
-        rows = self.repository.find_request(db, username)
-        if not rows:
-            response.data = []
-            return response
-
-        responders = self.repository.find_responders(db, [r.uuid for r, _, _ in rows])
-
-        count: dict[UUID, int] = defaultdict(int)
-        responded: set[UUID] = set()
-        for coach_response, responder in responders:
-            count[coach_response.request_uuid] += 1
-            if responder.username == username:
-                responded.add(coach_response.request_uuid)
-
         items: list[MatchRequestResponse] = []
-        for request, learner, requirement in rows:
+        for request, learner, requirement in self.repository.find_request(db, username):
             items.append(
                 MatchRequestResponse(
                     uuid=request.uuid,
@@ -153,48 +188,60 @@ class RequestService:
                         image_path=learner.image_path,
                     ),
                     requirement=self.to_requirement(requirement),
-                    response_count=count.get(request.uuid, 0),
-                    responded=request.uuid in responded,
                 )
             )
 
         response.data = items
         return response
 
-    def create_response(self, db: Session, req: CoachResponseCreate) -> Response_Model[CoachResponseResult]:
-        response: Response_Model = Response_Model(
-            status="success", message="Response sent, the learner can see it now"
-        )
+    def find_learner_phone(self, db: Session, coach_username: str, request_uuid: UUID) -> Response_Model[PhoneResponse]:
+        response: Response_Model = Response_Model(status="success", message="OK")
 
-        coach = self.repository.find_coach(db, req.username)
+        coach = self.repository.find_coach(db, coach_username)
         if coach is None:
             response.status = "error"
             response.message = "User does not exist"
             return response
 
-        request: LearnerRequest = self.repository.find_request_by_uuid(db, req.request_uuid)
+        request: LearnerRequest = self.repository.find_request_by_uuid(db, request_uuid)
         if request is None:
             response.status = "error"
             response.message = "Request does not exist"
             return response
 
-        if not self.repository.coach_has_skill(db, req.username, request.skill):
+        if not self.repository.coach_has_skill(db, coach_username, request.skill):
             response.status = "error"
             response.message = "You have not passed this skill yet"
             return response
 
-        try:
-            created = self.repository.create_response(db, req.username, req.request_uuid)
-        except IntegrityError:
-            db.rollback()
+        learner = self.repository.find_learner(db, request.username)
+        if learner is None:
             response.status = "error"
-            response.message = "You have already responded to this request"
+            response.message = "Learner does not exist"
             return response
 
-        response.data = CoachResponseResult(
-            uuid=created.uuid,
-            request_uuid=created.request_uuid,
-            skill=request.skill,
-            create_date=created.create_date,
-        )
+        response.data = PhoneResponse(username=learner.username, phone=learner.phone)
+        return response
+
+    def find_coach_phone(self, db: Session, learner_username: str, coach_username: str) -> Response_Model[PhoneResponse]:
+        response: Response_Model = Response_Model(status="success", message="OK")
+
+        learner = self.repository.find_learner(db, learner_username)
+        if learner is None:
+            response.status = "error"
+            response.message = "User does not exist"
+            return response
+
+        coach = self.repository.find_coach(db, coach_username)
+        if coach is None:
+            response.status = "error"
+            response.message = "Coach does not exist"
+            return response
+
+        if not self.repository.learner_requested_coach_skill(db, learner_username, coach_username):
+            response.status = "error"
+            response.message = "This coach does not match your requests"
+            return response
+
+        response.data = PhoneResponse(username=coach.username, phone=coach.phone)
         return response

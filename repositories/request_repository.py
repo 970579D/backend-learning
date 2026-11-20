@@ -3,9 +3,11 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from models.request_model import CoachResponse, LearnerRequest
+from models.coach_detail_model import CoachDetail
+from models.exam_model import ExamBooking, ExamSession
+from models.request_model import LearnerRequest
 from models.requirement_model import LearnerRequirement
-from models.skill_model import Skill, coach_skill
+from models.skill_model import Assessment, AssessmentAttempt, Skill, coach_skill
 from models.user_model import CoachProfile, Learner
 
 
@@ -28,6 +30,21 @@ class RequestRepository:
                     coach_skill.c.skill_name == skill,
                     coach_skill.c.status == "active",
                 )
+            )
+            is not None
+        )
+
+    def learner_requested_coach_skill(self, db: Session, learner_username: str, coach_username: str) -> bool:
+        return (
+            db.scalar(
+                select(LearnerRequest.id)
+                .join(coach_skill, coach_skill.c.skill_name == LearnerRequest.skill)
+                .where(
+                    LearnerRequest.username == learner_username,
+                    coach_skill.c.username == coach_username,
+                    coach_skill.c.status == "active",
+                )
+                .limit(1)
             )
             is not None
         )
@@ -67,17 +84,25 @@ class RequestRepository:
             .order_by(LearnerRequest.create_date.desc())
         ).all()
 
-    def find_responders(self, db: Session, request_uuids: list[UUID]):
+    def find_matching_coaches(self, db: Session, skills: list[str]):
         return db.execute(
-            select(CoachResponse, CoachProfile)
-            .join(CoachProfile, CoachProfile.username == CoachResponse.username)
-            .where(CoachResponse.request_uuid.in_(request_uuids))
-            .order_by(CoachResponse.create_date)
+            select(coach_skill.c.skill_name, CoachProfile, CoachDetail)
+            .join(CoachProfile, CoachProfile.username == coach_skill.c.username)
+            .outerjoin(CoachDetail, CoachDetail.username == CoachProfile.username)
+            .where(coach_skill.c.skill_name.in_(skills), coach_skill.c.status == "active")
         ).all()
 
-    def create_response(self, db: Session, username: str, request_uuid: UUID) -> CoachResponse:
-        response = CoachResponse(username=username, request_uuid=request_uuid)
-        db.add(response)
-        db.commit()
-        db.refresh(response)
-        return response
+    def find_scores(self, db: Session, skills: list[str], usernames: list[str]):
+        return db.execute(
+            select(
+                Assessment.username,
+                Assessment.assessment_skill,
+                Assessment.total_attempt,
+                AssessmentAttempt.score,
+                ExamSession.total_score,
+            )
+            .join(AssessmentAttempt, AssessmentAttempt.assessment_uuid == Assessment.uuid)
+            .outerjoin(ExamBooking, ExamBooking.attempt_id == AssessmentAttempt.id)
+            .outerjoin(ExamSession, ExamSession.uuid == ExamBooking.session_uuid)
+            .where(Assessment.assessment_skill.in_(skills), Assessment.username.in_(usernames))
+        ).all()

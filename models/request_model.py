@@ -33,36 +33,10 @@ class LearnerRequest(Base):
     )
 
 
-class CoachResponse(Base):
-    __tablename__ = "coach_response"
-    __table_args__ = (UniqueConstraint("username", "request_uuid", name="uq_coach_response"),)
-
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    uuid: Mapped[UUID] = mapped_column(Uuid, unique=True, default=uuid_lib.uuid4)
-    username: Mapped[str] = mapped_column(
-        String(50),
-        ForeignKey("coach_profile.username", ondelete="CASCADE", onupdate="CASCADE"),
-        index=True,
-    )
-    request_uuid: Mapped[UUID] = mapped_column(
-        ForeignKey("learner_request.uuid", ondelete="CASCADE", onupdate="CASCADE"),
-        index=True,
-    )
-    create_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    update_date: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )
-
-
 class LearnerRequestCreate(BaseModel):
     username: str
     skill: str
     description: str = ""
-
-
-class CoachResponseCreate(BaseModel):
-    username: str
-    request_uuid: UUID
 
 
 class RequirementResponse(BaseModel):
@@ -83,21 +57,11 @@ class LearnerInfo(BaseModel):
     image_path: Optional[str] = None
 
 
-class ResponderResponse(BaseModel):
-    uuid: UUID
-    username: str
-    firstname: str
-    lastname: str
-    image_path: Optional[str] = None
-    create_date: datetime
-
-
 class LearnerRequestResponse(BaseModel):
     uuid: UUID
     skill: str
     description: str
     create_date: datetime
-    responses: list[ResponderResponse] = []
 
 
 class MatchRequestResponse(BaseModel):
@@ -107,12 +71,32 @@ class MatchRequestResponse(BaseModel):
     create_date: datetime
     learner: LearnerInfo
     requirement: Optional[RequirementResponse] = None
-    response_count: int
-    responded: bool
 
 
-class CoachResponseResult(BaseModel):
+class MatchCoachResponse(BaseModel):
+    username: str
+    firstname: str
+    lastname: str
+    image_path: Optional[str] = None
+    about_coach: Optional[str] = None
+    course_description: Optional[str] = None
+    cost: Optional[int] = None
+    place_to_coach: Optional[str] = None
+    coaching_mode: Optional[str] = None
+    best_score: int
+    best_total_score: int
+    best_percent: int
+    total_attempt: int
+
+
+class LearnerMatchResponse(BaseModel):
     uuid: UUID
-    request_uuid: UUID
     skill: str
+    description: str
     create_date: datetime
+    coaches: list[MatchCoachResponse] = []
+
+
+class PhoneResponse(BaseModel):
+    username: str
+    phone: Optional[str] = None
