@@ -14,7 +14,9 @@ from repositories.exam_repository import ExamRepository
 
 PASS_PERCENT = 50
 CHECKIN_OPENS_BEFORE = timedelta(minutes=30)
-
+EXAM_TIMEZONE = timezone(timedelta(hours=7))
+EXAM_FIRST_MINUTE = 8 * 60
+EXAM_LAST_MINUTE = 21 * 60
 
 class ExamService:
 
@@ -58,10 +60,16 @@ class ExamService:
 
         exam_time: datetime = req.exam_time if req.exam_time.tzinfo else req.exam_time.replace(tzinfo=timezone.utc)
 
-        utc_time: datetime = exam_time.astimezone(timezone.utc)
-        if utc_time.minute % 15 != 0 or utc_time.second != 0 or utc_time.microsecond != 0:
+        local_time: datetime = exam_time.astimezone(EXAM_TIMEZONE)
+        if local_time.minute % 15 != 0 or local_time.second != 0 or local_time.microsecond != 0:
             response.status = "error"
             response.message = "Exam time must be on a 15-minute step (00, 15, 30, 45)"
+            return response
+
+        minutes: int = local_time.hour * 60 + local_time.minute
+        if minutes < EXAM_FIRST_MINUTE or minutes > EXAM_LAST_MINUTE:
+            response.status = "error"
+            response.message = "Exam time must be between 08:00 and 21:00"
             return response
 
         if exam_time <= datetime.now(timezone.utc):

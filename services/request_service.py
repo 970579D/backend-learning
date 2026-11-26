@@ -10,9 +10,14 @@ from models.request_model import (
 )
 from models.requirement_model import LearnerRequirement
 from models.response_model import Response_Model
+from models.special_request_model import (
+    AdminSpecialRequestResponse, LearnerSpecialRequest, SpecialRequestCreate, SpecialRequestResponse,
+)
 from repositories.request_repository import RequestRepository
 
 MAX_DESCRIPTION = 500
+MAX_NAME = 100
+OTHER_CATEGORY = "Other"
 
 
 class RequestService:
@@ -25,6 +30,16 @@ class RequestService:
             uuid=request.uuid,
             skill=request.skill,
             description=request.description,
+            create_date=request.create_date,
+        )
+
+    def to_special_response(self, request: LearnerSpecialRequest) -> SpecialRequestResponse:
+        return SpecialRequestResponse(
+            uuid=request.uuid,
+            skill_name=request.skill_name,
+            category=request.category,
+            description=request.description,
+            status=request.status,
             create_date=request.create_date,
         )
 
@@ -244,4 +259,85 @@ class RequestService:
             return response
 
         response.data = PhoneResponse(username=coach.username, phone=coach.phone)
+        return response
+
+    def create_special_request(self, db: Session, req: SpecialRequestCreate) -> Response_Model[SpecialRequestResponse]:
+        response: Response_Model = Response_Model(status="success", message="Requested, waiting for admin")
+
+        learner = self.repository.find_learner(db, req.username)
+        if learner is None:
+            response.status = "error"
+            response.message = "User does not exist"
+            return response
+
+        skill_name: str = req.skill_name.strip()
+        if not skill_name:
+            response.status = "error"
+            response.message = "Skill name is required"
+            return response
+
+        if len(skill_name) > MAX_NAME:
+            response.status = "error"
+            response.message = f"Skill name must be {MAX_NAME} characters or fewer"
+            return response
+
+        category: str = req.category.strip()
+        if category != OTHER_CATEGORY and not self.repository.category_exists(db, category):
+            response.status = "error"
+            response.message = "Category does not exist"
+            return response
+
+        description: str = req.description.strip()
+        if len(description) > MAX_DESCRIPTION:
+            response.status = "error"
+            response.message = f"Description must be {MAX_DESCRIPTION} characters or fewer"
+            return response
+
+        if self.repository.waiting_special_exists(db, req.username, skill_name):
+            response.status = "error"
+            response.message = "You already have a waiting request for this skill"
+            return response
+
+        request = self.repository.create_special_request(db, req.username, skill_name, category, description)
+
+        response.data = self.to_special_response(request)
+        return response
+
+    def find_special_by_learner(self, db: Session, username: str) -> Response_Model[list[SpecialRequestResponse]]:
+        response: Response_Model = Response_Model(status="success", message="OK")
+
+        learner = self.repository.find_learner(db, username)
+        if learner is None:
+            response.status = "error"
+            response.message = "User does not exist"
+            return response
+
+        items: list[SpecialRequestResponse] = []
+        for request in self.repository.find_special_by_learner(db, username):
+            items.append(self.to_special_response(request))
+
+        response.data = items
+        return response
+
+    def find_all_special(self, db: Session) -> Response_Model[list[AdminSpecialRequestResponse]]:
+        response: Response_Model = Response_Model(status="success", message="OK")
+
+        items: list[AdminSpecialRequestResponse] = []
+        for request, learner in self.repository.find_all_special(db):
+            items.append(
+                AdminSpecialRequestResponse(
+                    uuid=request.uuid,
+                    skill_name=request.skill_name,
+                    category=request.category,
+                    description=request.description,
+                    status=request.status,
+                    create_date=request.create_date,
+                    username=learner.username,
+                    firstname=learner.firstname,
+                    lastname=learner.lastname,
+                    image_path=learner.image_path,
+                )
+            )
+
+        response.data = items
         return response

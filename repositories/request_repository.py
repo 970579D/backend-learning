@@ -7,7 +7,8 @@ from models.coach_detail_model import CoachDetail
 from models.exam_model import ExamBooking, ExamSession
 from models.request_model import LearnerRequest
 from models.requirement_model import LearnerRequirement
-from models.skill_model import Assessment, AssessmentAttempt, Skill, coach_skill
+from models.skill_model import Assessment, AssessmentAttempt, Skill, SkillCategory, coach_skill
+from models.special_request_model import LearnerSpecialRequest
 from models.user_model import CoachProfile, Learner
 
 
@@ -21,6 +22,9 @@ class RequestRepository:
 
     def skill_exists(self, db: Session, skill: str) -> bool:
         return db.scalar(select(Skill.id).where(Skill.skill_name == skill)) is not None
+
+    def category_exists(self, db: Session, name: str) -> bool:
+        return db.scalar(select(SkillCategory.id).where(SkillCategory.category_name == name)) is not None
 
     def coach_has_skill(self, db: Session, username: str, skill: str) -> bool:
         return (
@@ -105,4 +109,46 @@ class RequestRepository:
             .outerjoin(ExamBooking, ExamBooking.attempt_id == AssessmentAttempt.id)
             .outerjoin(ExamSession, ExamSession.uuid == ExamBooking.session_uuid)
             .where(Assessment.assessment_skill.in_(skills), Assessment.username.in_(usernames))
+        ).all()
+
+    def waiting_special_exists(self, db: Session, username: str, skill_name: str) -> bool:
+        return (
+            db.scalar(
+                select(LearnerSpecialRequest.id).where(
+                    LearnerSpecialRequest.username == username,
+                    LearnerSpecialRequest.status == "waiting",
+                    LearnerSpecialRequest.skill_name.ilike(skill_name),
+                )
+            )
+            is not None
+        )
+
+    def create_special_request(
+        self, db: Session, username: str, skill_name: str, category: str, description: str
+    ) -> LearnerSpecialRequest:
+        request = LearnerSpecialRequest(
+            username=username, skill_name=skill_name, category=category, description=description
+        )
+        db.add(request)
+        db.commit()
+        db.refresh(request)
+        return request
+
+    def find_special_by_learner(self, db: Session, username: str) -> list[LearnerSpecialRequest]:
+        return list(
+            db.scalars(
+                select(LearnerSpecialRequest)
+                .where(LearnerSpecialRequest.username == username)
+                .order_by(LearnerSpecialRequest.create_date.desc())
+            ).all()
+        )
+
+    def find_all_special(self, db: Session):
+        return db.execute(
+            select(LearnerSpecialRequest, Learner)
+            .join(Learner, Learner.username == LearnerSpecialRequest.username)
+            .order_by(
+                LearnerSpecialRequest.status != "waiting",
+                LearnerSpecialRequest.create_date.desc(),
+            )
         ).all()
