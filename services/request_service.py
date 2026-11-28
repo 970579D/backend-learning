@@ -14,10 +14,18 @@ from models.special_request_model import (
     AdminSpecialRequestResponse, LearnerSpecialRequest, SpecialRequestCreate, SpecialRequestResponse,
 )
 from repositories.request_repository import RequestRepository
-
+from datetime import date as dt_date, datetime, time as dt_time, timezone
+from zoneinfo import ZoneInfo
+from models.special_request_model import (
+        AdminSpecialRequestResponse, CoachInterest, CoachInterestCreate, CoachSpecialResponse,
+        InterestedCoachResponse, LearnerSpecialRequest, SpecialRequestCreate, SpecialRequestResponse,
+    )
 MAX_DESCRIPTION = 500
 MAX_NAME = 100
 OTHER_CATEGORY = "Other"
+INTEREST_TIMEZONE = ZoneInfo("Asia/Bangkok")
+INTEREST_FIRST_MINUTE = 8 * 60
+INTEREST_LAST_MINUTE = 21 * 60
 
 
 class RequestService:
@@ -322,8 +330,15 @@ class RequestService:
     def find_all_special(self, db: Session) -> Response_Model[list[AdminSpecialRequestResponse]]:
         response: Response_Model = Response_Model(status="success", message="OK")
 
+        rows = self.repository.find_all_special(db)
+
+        by_request: dict[UUID, list[InterestedCoachResponse]] = defaultdict(list)
+        if rows:
+            for interest, coach in self.repository.find_interests(db, [r.uuid for r, _ in rows]):
+                by_request[interest.learner_request_uuid].append(self.to_interest(interest, coach))
+
         items: list[AdminSpecialRequestResponse] = []
-        for request, learner in self.repository.find_all_special(db):
+        for request, learner in rows:
             items.append(
                 AdminSpecialRequestResponse(
                     uuid=request.uuid,
@@ -336,8 +351,137 @@ class RequestService:
                     firstname=learner.firstname,
                     lastname=learner.lastname,
                     image_path=learner.image_path,
+                    interests=by_request.get(request.uuid, []),
                 )
             )
 
         response.data = items
         return response
+
+    def start_finding(self, db: Session, request_uuid: UUID) -> Response_Model[SpecialRequestResponse]:
+        response: Response_Model = Response_Model(status="success", message="Finding a coach")
+
+        request: LearnerSpecialRequest = self.repository.find_special_by_uuid(db, request_uuid)
+        if request is None:
+            response.status = "error"
+            response.message = "Request does not exist"
+            return response
+
+        if request.status != "waiting":
+            response.status = "error"
+            response.message = "Only a waiting request can start finding a coach"
+            return response
+
+        request = self.repository.set_special_status(db, request, "finding_coach")
+
+        response.data = self.to_special_response(request)
+        return response
+
+    def find_special_for_coach(self, db: Session, username: str) -> Response_Model[list[CoachSpecialResponse]]:
+        response: Response_Model = Response_Model(status="success", message="OK")
+
+        coach = self.repository.find_coach(db, username)
+        if coach is None:
+            response.status = "error"
+            response.message = "User does not exist"
+            return response
+
+        requests: list[LearnerSpecialRequest] = self.repository.find_finding_special(db)
+        if not requests:
+            response.data = []
+            return response
+
+        count: dict[UUID, int] = defaultdict(int)
+        own: dict[UUID, CoachInterest] = {}
+        for interest, _ in self.repository.find_interests(db, [r.uuid for r in requests]):
+            count[interest.learner_request_uuid] += 1
+            if interest.username == username:
+                own[interest.learner_request_uuid] = interest
+
+        items: list[CoachSpecialResponse] = []
+        for request in requests:
+            mine = own.get(request.uuid)
+            items.append(
+                CoachSpecialResponse(
+                    uuid=request.uuid,
+                    skill_name=request.skill_name,
+                    category=request.category,
+                    description=request.description,
+                    create_date=request.create_date,
+                    interest_count=count.get(request.uuid, 0),
+                    interested=mine is not None,
+                    interest_date=mine.date.isoformat() if mine else None,
+                    interest_time=mine.time.strftime("%H:%M") if mine else None,
+                )
+            )
+
+        response.data = items
+        return response
+
+    def create_interest(self, db: Session, req: CoachInterestCreate) -> Response_Model[InterestedCoachResponse]:
+        response: Response_Model = Response_Model(status="success", message="Interest saved")
+
+        coach = self.repository.find_coach(db, req.username)
+        if coach is None:
+            response.status = "error"
+            response.message = "User does not exist"
+            return response
+
+        request: LearnerSpecialRequest = self.repository.find_special_by_uuid(db, req.request_uuid)
+        if request is None:
+            response.status = "error"
+            response.message = "Request does not exist"
+            return response
+
+        if request.status != "finding_coach":
+            response.status = "error"
+            response.message = "This request is not looking for a coach"
+            return response
+
+        try:
+            day: dt_date = dt_date.fromisoformat(req.date)
+            slot: dt_time = dt_time.fromisoformat(req.time)
+        except ValueError:
+            response.status = "error"
+            response.message = "Date or time is not valid"
+            return response
+
+        minutes: int = slot.hour * 60 + slot.minute
+        if (
+            slot.second != 0
+            or slot.microsecond != 0
+            or slot.minute % 15 != 0
+            or minutes < INTEREST_FIRST_MINUTE
+            or minutes > INTEREST_LAST_MINUTE
+        ):
+            response.status = "error"
+            response.message = "Time must be between 08:00 and 21:00 in 15-minute steps"
+            return response
+
+        when: datetime = datetime.combine(day, slot, tzinfo=INTEREST_TIMEZONE)
+        if when <= datetime.now(timezone.utc):
+            response.status = "error"
+            response.message = "Date and time must be in the future"
+            return response
+
+        try:
+            interest = self.repository.create_interest(db, req.username, req.request_uuid, day, slot)
+        except IntegrityError:
+            db.rollback()
+            response.status = "error"
+            response.message = "You have already shown interest in this request"
+            return response
+
+        response.data = self.to_interest(interest, coach)
+        return response
+
+
+    def to_interest(self, interest: CoachInterest, coach) -> InterestedCoachResponse:
+        return InterestedCoachResponse(
+            username=coach.username,
+            firstname=coach.firstname,
+            lastname=coach.lastname,
+            image_path=coach.image_path,
+            date=interest.date.isoformat(),
+            time=interest.time.strftime("%H:%M"),
+        )

@@ -8,7 +8,7 @@ from models.exam_model import ExamBooking, ExamSession
 from models.request_model import LearnerRequest
 from models.requirement_model import LearnerRequirement
 from models.skill_model import Assessment, AssessmentAttempt, Skill, SkillCategory, coach_skill
-from models.special_request_model import LearnerSpecialRequest
+from models.special_request_model import LearnerSpecialRequest, CoachInterest
 from models.user_model import CoachProfile, Learner
 
 
@@ -125,7 +125,7 @@ class RequestRepository:
 
     def create_special_request(
         self, db: Session, username: str, skill_name: str, category: str, description: str
-    ) -> LearnerSpecialRequest:
+        ) -> LearnerSpecialRequest:
         request = LearnerSpecialRequest(
             username=username, skill_name=skill_name, category=category, description=description
         )
@@ -152,3 +152,44 @@ class RequestRepository:
                 LearnerSpecialRequest.create_date.desc(),
             )
         ).all()
+
+    def find_special_by_uuid(self, db: Session, request_uuid: UUID) -> LearnerSpecialRequest | None:
+        return db.scalar(
+            select(LearnerSpecialRequest).where(LearnerSpecialRequest.uuid == request_uuid)
+        )
+
+    def set_special_status(
+            self, db: Session, request: LearnerSpecialRequest, status: str
+        ) -> LearnerSpecialRequest:
+        request.status = status
+        db.commit()
+        db.refresh(request)
+        return request
+
+    def find_finding_special(self, db: Session) -> list[LearnerSpecialRequest]:
+        return list(
+            db.scalars(
+                select(LearnerSpecialRequest)
+                .where(LearnerSpecialRequest.status == "finding_coach")
+                .order_by(LearnerSpecialRequest.create_date.desc())
+            ).all()
+        )
+
+    def find_interests(self, db: Session, request_uuids: list[UUID]):
+        return db.execute(
+            select(CoachInterest, CoachProfile)
+            .join(CoachProfile, CoachProfile.username == CoachInterest.username)
+            .where(CoachInterest.learner_request_uuid.in_(request_uuids))
+            .order_by(CoachInterest.date, CoachInterest.time)
+        ).all()
+
+    def create_interest(
+            self, db: Session, username: str, request_uuid: UUID, day, slot
+        ) -> CoachInterest:
+        interest = CoachInterest(
+            username=username, learner_request_uuid=request_uuid, date=day, time=slot
+        )
+        db.add(interest)
+        db.commit()
+        db.refresh(interest)
+        return interest

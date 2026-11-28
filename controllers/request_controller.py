@@ -5,9 +5,8 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models.request_model import LearnerRequestCreate
-from models.special_request_model import SpecialRequestCreate
+from models.special_request_model import CoachInterestCreate, SpecialRequestCreate
 from services.request_service import RequestService
-
 router = APIRouter(prefix="/request", tags=["Request"])
 
 request_service = RequestService()
@@ -48,3 +47,15 @@ def find_all_special(db: Session = Depends(get_db)):
 @router.get("/special/learner/{username}")
 def find_special_by_learner(username: str, db: Session = Depends(get_db)):
     return request_service.find_special_by_learner(db, username)
+
+@router.put("/special/{request_uuid}/finding")
+def start_finding(request_uuid: UUID, db: Session = Depends(get_db)):
+    return request_service.start_finding(db, request_uuid)
+
+@router.get("/special/coach/{username}")
+def find_special_for_coach(username: str, db: Session = Depends(get_db)):
+    return request_service.find_special_for_coach(db, username)
+
+@router.post("/special/interest")
+def create_interest(req: CoachInterestCreate, db: Session = Depends(get_db)):
+    return request_service.create_interest(db, req)
